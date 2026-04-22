@@ -24,3 +24,12 @@ npm run e2e
 ## Production notes
 
 - Set CSP and security headers at the CDN/server layer (see `docs/SECURITY_HEADERS.md`).
+
+## Production (Docker)
+
+```bash
+docker build -t ai-ide-web .
+docker run --rm -p 8080:80 ai-ide-web
+```
+
+Open `http://localhost:8080`.
