@@ -6,6 +6,7 @@
     "documentation/",
     ".angular/",
     ".husky/",
+    "ai-ide-web-tmp/",
     "node_modules/"
   ],
   "overrides": [
@@ -13,7 +14,7 @@
       "files": ["*.ts"],
       "parser": "@typescript-eslint/parser",
       "parserOptions": {
-        "project": ["tsconfig.json"],
+        "project": ["tsconfig.eslint.json"],
         "createDefaultProgram": true
       },
       "plugins": ["@typescript-eslint", "@angular-eslint", "import", "rxjs"],

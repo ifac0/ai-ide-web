@@ -5,7 +5,7 @@ import {
   type HttpHandlerFn,
   type HttpInterceptorFn,
   type HttpRequest,
-  type HttpResponse,
+  HttpResponse,
 } from "@angular/common/http";
 import { concat, of, timer, type Observable } from "rxjs";
 import { map } from "rxjs/operators";

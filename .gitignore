@@ -7,4 +7,5 @@ documentation/
 .DS_Store
 playwright-report/
 test-results/
+ai-ide-web-tmp/
 
