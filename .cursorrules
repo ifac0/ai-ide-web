@@ -1,0 +1,38 @@
+Arquitetura e regras obrigatórias (Angular 21 SPA IDE)
+
+- Proibição absoluta de SSR: nunca instalar, configurar ou mencionar Angular Universal/@angular/ssr.
+- Standalone components obrigatórios: não usar NgModules de feature.
+- Estrutura de pastas obrigatória:
+  - src/app/core: serviços singleton, interceptors, error handlers, guards, providers globais.
+  - src/app/shared: componentes dumb de UI, pipes e utilitários puros sem estado global.
+  - src/app/features: componentes smart, páginas e lógicas de domínio (editor, ai-chat, dashboard).
+  - Nenhuma lógica de negócio na raiz de src/app.
+
+Estado e fluxo assíncrono
+
+- Estado global da IDE exclusivamente com @ngrx/signals (SignalStore).
+- Conectar fluxos assíncronos ao SignalStore exclusivamente via rxMethod (eventos do Monaco, HTTP, SSE).
+- IA deve usar SSE com streaming em tempo real.
+- Toda a pipeline SSE (retry, catchError, parsing, cancelamento) deve ficar isolada no AIService.
+
+Performance e carregamento
+
+- Obrigatório usar @defer para atrasar o carregamento do Monaco Editor até o layout principal estabilizar.
+- Wrapper do Monaco deve usar monaco-editor puro (sem wrappers de terceiros).
+
+HTTP e mocks
+
+- Interceptors devem ser funcionais (HttpInterceptorFn).
+- Deve existir um interceptor de mock isolado para simular streaming SSE localmente.
+
+Forms e templates
+
+- Forms exclusivamente com Reactive Forms tipadas.
+- Preferir @let para extrair controls e valores em templates.
+
+Comentários e documentação (regra inegociável)
+
+- Proibido escrever comentários explicativos inline (// ...) e blocos descritivos dentro de funções.
+- JSDoc permitido apenas em classes, interfaces e assinaturas de métodos públicos.
+- Código deve ser autoexplicativo por nomeação e tipagem.
+

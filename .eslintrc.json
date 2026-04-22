@@ -1,0 +1,65 @@
+{
+  "root": true,
+  "ignorePatterns": [
+    "dist/",
+    "coverage/",
+    "documentation/",
+    ".angular/",
+    ".husky/",
+    "node_modules/"
+  ],
+  "overrides": [
+    {
+      "files": ["*.ts"],
+      "parser": "@typescript-eslint/parser",
+      "parserOptions": {
+        "project": ["tsconfig.json"],
+        "createDefaultProgram": true
+      },
+      "plugins": ["@typescript-eslint", "@angular-eslint", "import", "rxjs", "rxjs-angular"],
+      "extends": [
+        "eslint:recommended",
+        "plugin:@typescript-eslint/recommended-type-checked",
+        "plugin:@typescript-eslint/stylistic-type-checked",
+        "plugin:@angular-eslint/recommended",
+        "plugin:rxjs/recommended",
+        "plugin:rxjs-angular/recommended",
+        "prettier"
+      ],
+      "rules": {
+        "@typescript-eslint/consistent-type-imports": [
+          "error",
+          {
+            "prefer": "type-imports",
+            "disallowTypeAnnotations": false,
+            "fixStyle": "inline-type-imports"
+          }
+        ],
+        "@typescript-eslint/no-floating-promises": "error",
+        "@typescript-eslint/no-misused-promises": "error",
+        "@typescript-eslint/no-unused-vars": [
+          "error",
+          {
+            "argsIgnorePattern": "^_",
+            "varsIgnorePattern": "^_",
+            "caughtErrorsIgnorePattern": "^_"
+          }
+        ],
+        "import/order": [
+          "error",
+          {
+            "alphabetize": { "order": "asc", "caseInsensitive": true },
+            "newlines-between": "always",
+            "groups": [["builtin", "external"], "internal", ["parent", "sibling", "index"], "object", "type"]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["*.html"],
+      "extends": ["plugin:@angular-eslint/template/recommended", "prettier"],
+      "rules": {}
+    }
+  ]
+}
+
