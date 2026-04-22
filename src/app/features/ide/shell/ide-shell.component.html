@@ -1,10 +1,12 @@
 <div
   class="h-dvh w-dvw grid"
   [style.gridTemplateColumns]="' ' + store.sidebarWidthPx() + 'px 1fr'"
+  data-testid="ide-root"
 >
   <aside
     class="h-full border-r border-[color:var(--color-border)] bg-[color:var(--color-panel)] relative"
     [ngClass]="sidebarCollapsed ? 'w-12' : ''"
+    data-testid="ide-sidebar"
   >
     <div
       class="h-12 flex items-center gap-2 px-2 border-b border-[color:var(--color-border)]"
@@ -14,6 +16,7 @@
         type="button"
         class="h-9 w-9 rounded-md border border-[color:var(--color-border)] text-sm"
         (click)="toggleSidebar()"
+        data-testid="sidebar-toggle"
       >
         ≡
       </button>
@@ -33,6 +36,7 @@
                 type="button"
                 class="text-left px-2 py-2 rounded-md border border-transparent hover:border-[color:var(--color-border)]"
                 (click)="store.toggleFolder(node.path)"
+                [attr.data-testid]="'explorer-folder-' + node.path"
               >
                 <div class="text-sm">
                   {{ openFolders.has(node.path) ? "▾" : "▸" }} {{ node.name }}
@@ -50,6 +54,7 @@
                           ? store.openFile(child.path)
                           : store.toggleFolder(child.path)
                       "
+                      [attr.data-testid]="'explorer-node-' + child.path"
                     >
                       <div class="text-sm">{{ child.name }}</div>
                     </button>
@@ -61,6 +66,7 @@
                 type="button"
                 class="text-left px-2 py-2 rounded-md border border-transparent hover:border-[color:var(--color-border)]"
                 (click)="store.openFile(node.path)"
+                [attr.data-testid]="'explorer-node-' + node.path"
               >
                 <div class="text-sm">{{ node.name }}</div>
               </button>
@@ -80,6 +86,7 @@
                   : ''
               "
               (click)="store.setActiveTab(tab.id)"
+              [attr.data-testid]="'tab-' + tab.title"
             >
               <div class="text-sm">{{ tab.title }}</div>
             </button>
@@ -90,6 +97,7 @@
           type="button"
           class="mt-3 w-full px-2 py-2 rounded-md border border-[color:var(--color-border)] text-sm"
           (click)="store.openScratchTab()"
+          data-testid="new-scratch-tab"
         >
           New scratch tab
         </button>
@@ -100,6 +108,7 @@
       <div
         #sidebarResizeHandle
         class="absolute top-0 right-0 h-full w-1 cursor-col-resize bg-transparent hover:bg-white/10"
+        data-testid="sidebar-resize"
       ></div>
     }
   </aside>
@@ -115,6 +124,7 @@
             [value]="active.value"
             [language]="active.language"
             (valueChange)="store.editorValueChanged($event)"
+            data-testid="monaco-editor"
           />
         } @placeholder {
           <div
@@ -132,16 +142,19 @@
 
     <section
       class="border-t border-[color:var(--color-border)] bg-[color:var(--color-panel)]"
+      data-testid="bottom-panel"
     >
       <div
         #bottomResizeHandle
         class="h-1 w-full cursor-row-resize bg-transparent hover:bg-white/10"
+        data-testid="bottom-resize"
       ></div>
       <div
         class="p-3"
         [style.height.px]="
           store.bottomPanelOpen() ? store.bottomPanelHeightPx() : 56
         "
+        data-testid="bottom-content"
       >
         <div class="mb-2 flex items-center gap-3 text-xs">
           <label class="flex items-center gap-2">
@@ -150,6 +163,7 @@
               class="h-4 w-4"
               [checked]="store.ai().useMock"
               (change)="store.setUseMock($any($event.target).checked)"
+              data-testid="toggle-mock"
             />
             Mock streaming
           </label>
@@ -158,6 +172,7 @@
             class="h-8 px-3 rounded-md border border-[color:var(--color-border)] text-xs disabled:opacity-60"
             [disabled]="!store.ai().streaming"
             (click)="store.cancelStream()"
+            data-testid="cancel-stream"
           >
             Cancel
           </button>
@@ -165,6 +180,7 @@
             type="button"
             class="h-8 px-3 rounded-md border border-[color:var(--color-border)] text-xs"
             (click)="store.setBottomPanelOpen(!store.bottomPanelOpen())"
+            data-testid="toggle-bottom-panel"
           >
             {{ store.bottomPanelOpen() ? "Hide" : "Show" }}
           </button>
@@ -181,11 +197,13 @@
             type="text"
             placeholder="Ask the AI (streaming via SSE)"
             [formControl]="prompt"
+            data-testid="ai-prompt"
           />
           <button
             class="h-10 px-4 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-brand)] text-black text-sm font-semibold disabled:opacity-60"
             type="submit"
             [disabled]="form.invalid || store.ai().streaming"
+            data-testid="send-prompt"
           >
             Send
           </button>
@@ -194,6 +212,7 @@
         @if (store.ai().output.length > 0) {
           <pre
             class="mt-3 text-xs whitespace-pre-wrap font-[family:var(--font-mono)]"
+            data-testid="ai-output"
             >{{ store.ai().output }}</pre
           >
         }
