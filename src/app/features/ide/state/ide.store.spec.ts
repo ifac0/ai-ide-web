@@ -25,6 +25,24 @@ describe("IdeStore", () => {
     expect(store.activeTab()).not.toBeNull();
   });
 
+  it("opens a file from the explorer into a tab", () => {
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: AI_CLIENT_CONFIG,
+          useValue: { streamUrl: "/api/ai/stream", defaultMockEnabled: true },
+        },
+      ],
+    });
+    const store = TestBed.inject(IdeStore);
+
+    const before = store.tabs().length;
+    store.openFile("/README.md");
+
+    expect(store.tabs().length).toBe(before + 1);
+    expect(store.activeTab()?.title).toBe("README.md");
+  });
+
   it("updates active tab value via editorValueChanged rxMethod", () => {
     TestBed.configureTestingModule({
       providers: [

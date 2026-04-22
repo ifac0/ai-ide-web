@@ -21,7 +21,51 @@
 
     @if (!sidebarCollapsed) {
       <div class="p-2">
-        <div class="text-xs uppercase opacity-70 mb-2">Tabs</div>
+        <div class="text-xs uppercase opacity-70 mb-2">Files</div>
+        @let openFolders = store.openFolderPaths();
+        <div class="flex flex-col gap-1">
+          @for (node of store.explorerRoot().children ?? []; track node.id) {
+            @if (node.kind === "folder") {
+              <button
+                type="button"
+                class="text-left px-2 py-2 rounded-md border border-transparent hover:border-[color:var(--color-border)]"
+                (click)="store.toggleFolder(node.path)"
+              >
+                <div class="text-sm">
+                  {{ openFolders.has(node.path) ? "▾" : "▸" }} {{ node.name }}
+                </div>
+              </button>
+
+              @if (openFolders.has(node.path)) {
+                <div class="pl-3 flex flex-col gap-1">
+                  @for (child of node.children ?? []; track child.id) {
+                    <button
+                      type="button"
+                      class="text-left px-2 py-2 rounded-md border border-transparent hover:border-[color:var(--color-border)]"
+                      (click)="
+                        child.kind === 'file'
+                          ? store.openFile(child.path)
+                          : store.toggleFolder(child.path)
+                      "
+                    >
+                      <div class="text-sm">{{ child.name }}</div>
+                    </button>
+                  }
+                </div>
+              }
+            } @else {
+              <button
+                type="button"
+                class="text-left px-2 py-2 rounded-md border border-transparent hover:border-[color:var(--color-border)]"
+                (click)="store.openFile(node.path)"
+              >
+                <div class="text-sm">{{ node.name }}</div>
+              </button>
+            }
+          }
+        </div>
+
+        <div class="mt-4 text-xs uppercase opacity-70 mb-2">Tabs</div>
         <div class="flex flex-col gap-1">
           @for (tab of store.tabs(); track tab.id) {
             <button
@@ -105,6 +149,7 @@
       >
         @let prompt = form.controls.prompt;
         <input
+          #promptInput
           class="flex-1 h-10 rounded-md border border-[color:var(--color-border)] bg-black/20 px-3 text-sm"
           type="text"
           placeholder="Ask the AI (streaming via SSE)"
