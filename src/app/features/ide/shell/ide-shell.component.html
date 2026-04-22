@@ -345,6 +345,14 @@
           <button
             type="button"
             class="h-8 px-3 rounded-md border border-[color:var(--color-border)] text-xs"
+            (click)="store.clearAiOutput()"
+            data-testid="clear-ai-output"
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            class="h-8 px-3 rounded-md border border-[color:var(--color-border)] text-xs"
             (click)="store.setBottomPanelOpen(!store.bottomPanelOpen())"
             data-testid="toggle-bottom-panel"
           >
@@ -381,6 +389,26 @@
             data-testid="ai-output"
             >{{ store.ai().output }}</pre
           >
+        }
+
+        @if (store.ai().history.length > 0) {
+          <div class="mt-4">
+            <div class="text-xs uppercase opacity-70 mb-2">History</div>
+            <div class="flex flex-col gap-2">
+              @for (h of store.ai().history; track h.id) {
+                <div
+                  class="rounded-md border border-[color:var(--color-border)] p-2"
+                >
+                  <div class="text-[10px] opacity-70">{{ h.at }}</div>
+                  <div class="text-xs font-semibold mt-1">{{ h.prompt }}</div>
+                  <pre
+                    class="mt-1 text-xs whitespace-pre-wrap font-[family:var(--font-mono)] opacity-80"
+                    >{{ h.output }}</pre
+                  >
+                </div>
+              }
+            </div>
+          </div>
         }
       </div>
     </section>

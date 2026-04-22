@@ -94,6 +94,12 @@ export interface IdeState {
     streaming: boolean;
     output: string;
     useMock: boolean;
+    history: {
+      id: string;
+      at: string;
+      prompt: string;
+      output: string;
+    }[];
   };
 }
 
@@ -180,8 +186,13 @@ const initialState: IdeState = {
     streaming: false,
     output: "",
     useMock: true,
+    history: [],
   },
 };
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
 
 function randomId(): string {
   return crypto.randomUUID();
@@ -412,7 +423,20 @@ export const IdeStore = signalStore(
 
     const onAiEvent = (evt: AiStreamEvent): void => {
       if ("done" in evt) {
-        patchState(s, { ai: { ...s.ai(), streaming: false } });
+        const ai = s.ai();
+        const entry = {
+          id: randomId(),
+          at: nowIso(),
+          prompt: ai.prompt,
+          output: ai.output,
+        };
+        patchState(s, {
+          ai: {
+            ...ai,
+            streaming: false,
+            history: [entry].concat(ai.history).slice(0, 20),
+          },
+        });
         return;
       }
       patchState(s, { ai: { ...s.ai(), output: s.ai().output + evt.delta } });
@@ -444,6 +468,7 @@ export const IdeStore = signalStore(
       trigger$.pipe(
         tap(() => {
           cancel$.next();
+          service.cancelActiveRequest();
           patchState(s, { ai: { ...s.ai(), streaming: false } });
         }),
       ),
@@ -838,6 +863,9 @@ export const IdeStore = signalStore(
       },
       setUseMock(useMock: boolean): void {
         patchState(s, { ai: { ...s.ai(), useMock } });
+      },
+      clearAiOutput(): void {
+        patchState(s, { ai: { ...s.ai(), output: "" } });
       },
       startPromptStream(): void {
         streamPrompt(s.ai().prompt);

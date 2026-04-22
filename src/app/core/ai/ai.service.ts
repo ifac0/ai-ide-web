@@ -15,7 +15,7 @@ import {
   retry,
   scan,
   share,
-  type Observable,
+  Observable,
 } from "rxjs";
 
 import { AI_CLIENT_CONFIG } from "./ai.config";
@@ -84,6 +84,13 @@ export class AiService {
     refillPerSecond: 0.5,
   });
 
+  private currentAbort: AbortController | null = null;
+
+  cancelActiveRequest(): void {
+    this.currentAbort?.abort();
+    this.currentAbort = null;
+  }
+
   streamCompletion(
     prompt: string,
     options?: { mock?: boolean },
@@ -97,27 +104,97 @@ export class AiService {
     const headers = mockEnabled ? { "x-mock-ai": "1" } : undefined;
     const requestId = crypto.randomUUID();
 
-    const events$ = this.http.request("POST", this.config.streamUrl, {
-      body: { prompt, requestId },
-      observe: "events",
-      responseType: "text",
-      reportProgress: true,
-      headers,
+    const http$ = this.http
+      .request("POST", this.config.streamUrl, {
+        body: { prompt, requestId },
+        observe: "events",
+        responseType: "text",
+        reportProgress: true,
+        headers,
+      })
+      .pipe(
+        filter(isDownloadProgress),
+        map(extractText),
+        scan(
+          (acc, next) => {
+            const parsed = parseSseChunks(acc.buffer + next);
+            return { buffer: parsed.rest, chunks: parsed.chunks };
+          },
+          { buffer: "", chunks: [] as SseChunk[] },
+        ),
+        concatMap((s) => from(s.chunks)),
+        map(toEvent),
+        filter((e): e is AiStreamEvent => e !== null),
+      );
+
+    const fetch$ = new Observable<AiStreamEvent>((subscriber) => {
+      const controller = new AbortController();
+      this.currentAbort = controller;
+
+      const run = async (): Promise<void> => {
+        try {
+          const res = await fetch(this.config.streamUrl, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ prompt, requestId }),
+            signal: controller.signal,
+          });
+
+          if (!res.ok) {
+            subscriber.next({ done: true });
+            subscriber.complete();
+            return;
+          }
+
+          const reader = res.body?.getReader();
+          if (!reader) {
+            subscriber.next({ done: true });
+            subscriber.complete();
+            return;
+          }
+
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let doneReading = false;
+          while (!doneReading) {
+            const { done, value } = await reader.read();
+            if (done) {
+              doneReading = true;
+              break;
+            }
+            buffer += decoder.decode(value, { stream: true });
+            const parsed = parseSseChunks(buffer);
+            buffer = parsed.rest;
+            for (const chunk of parsed.chunks) {
+              const evt = toEvent(chunk);
+              if (evt) subscriber.next(evt);
+            }
+          }
+
+          subscriber.next({ done: true });
+          subscriber.complete();
+        } catch (err) {
+          if (controller.signal.aborted) {
+            subscriber.next({ done: true });
+            subscriber.complete();
+            return;
+          }
+          subscriber.error(err);
+        } finally {
+          if (this.currentAbort === controller) {
+            this.currentAbort = null;
+          }
+        }
+      };
+
+      void run();
+      return () => controller.abort();
     });
 
-    return events$.pipe(
-      filter(isDownloadProgress),
-      map(extractText),
-      scan(
-        (acc, next) => {
-          const parsed = parseSseChunks(acc.buffer + next);
-          return { buffer: parsed.rest, chunks: parsed.chunks };
-        },
-        { buffer: "", chunks: [] as SseChunk[] },
-      ),
-      concatMap((s) => from(s.chunks)),
-      map(toEvent),
-      filter((e): e is AiStreamEvent => e !== null),
+    const canFetch = typeof fetch === "function";
+    const source$ = mockEnabled ? http$ : canFetch ? fetch$ : http$;
+
+    return source$.pipe(
       retry({ count: 2, delay: 250 }),
       catchError((err: unknown) => {
         this.logger.error("ai.stream.error", { requestId, err });
