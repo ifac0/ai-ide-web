@@ -1,7 +1,10 @@
-<div class="h-dvh w-dvw grid grid-cols-[auto_1fr]">
+<div
+  class="h-dvh w-dvw grid"
+  [style.gridTemplateColumns]="' ' + store.sidebarWidthPx() + 'px 1fr'"
+>
   <aside
-    class="h-full border-r border-[color:var(--color-border)] bg-[color:var(--color-panel)]"
-    [ngClass]="sidebarCollapsed ? 'w-12' : 'w-72'"
+    class="h-full border-r border-[color:var(--color-border)] bg-[color:var(--color-panel)] relative"
+    [ngClass]="sidebarCollapsed ? 'w-12' : ''"
   >
     <div
       class="h-12 flex items-center gap-2 px-2 border-b border-[color:var(--color-border)]"
@@ -92,6 +95,13 @@
         </button>
       </div>
     }
+
+    @if (!sidebarCollapsed) {
+      <div
+        #sidebarResizeHandle
+        class="absolute top-0 right-0 h-full w-1 cursor-col-resize bg-transparent hover:bg-white/10"
+      ></div>
+    }
   </aside>
 
   <main class="h-full grid grid-rows-[1fr_auto]">
@@ -121,55 +131,73 @@
     </section>
 
     <section
-      class="border-t border-[color:var(--color-border)] bg-[color:var(--color-panel)] p-3"
+      class="border-t border-[color:var(--color-border)] bg-[color:var(--color-panel)]"
     >
-      <div class="mb-2 flex items-center gap-3 text-xs">
-        <label class="flex items-center gap-2">
-          <input
-            type="checkbox"
-            class="h-4 w-4"
-            [checked]="store.ai().useMock"
-            (change)="store.setUseMock($any($event.target).checked)"
-          />
-          Mock streaming
-        </label>
-        <button
-          type="button"
-          class="h-8 px-3 rounded-md border border-[color:var(--color-border)] text-xs disabled:opacity-60"
-          [disabled]="!store.ai().streaming"
-          (click)="store.cancelStream()"
-        >
-          Cancel
-        </button>
-      </div>
-      <form
-        class="flex items-center gap-2"
-        [formGroup]="form"
-        (ngSubmit)="submitPrompt()"
+      <div
+        #bottomResizeHandle
+        class="h-1 w-full cursor-row-resize bg-transparent hover:bg-white/10"
+      ></div>
+      <div
+        class="p-3"
+        [style.height.px]="
+          store.bottomPanelOpen() ? store.bottomPanelHeightPx() : 56
+        "
       >
-        @let prompt = form.controls.prompt;
-        <input
-          #promptInput
-          class="flex-1 h-10 rounded-md border border-[color:var(--color-border)] bg-black/20 px-3 text-sm"
-          type="text"
-          placeholder="Ask the AI (streaming via SSE)"
-          [formControl]="prompt"
-        />
-        <button
-          class="h-10 px-4 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-brand)] text-black text-sm font-semibold disabled:opacity-60"
-          type="submit"
-          [disabled]="form.invalid || store.ai().streaming"
+        <div class="mb-2 flex items-center gap-3 text-xs">
+          <label class="flex items-center gap-2">
+            <input
+              type="checkbox"
+              class="h-4 w-4"
+              [checked]="store.ai().useMock"
+              (change)="store.setUseMock($any($event.target).checked)"
+            />
+            Mock streaming
+          </label>
+          <button
+            type="button"
+            class="h-8 px-3 rounded-md border border-[color:var(--color-border)] text-xs disabled:opacity-60"
+            [disabled]="!store.ai().streaming"
+            (click)="store.cancelStream()"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            class="h-8 px-3 rounded-md border border-[color:var(--color-border)] text-xs"
+            (click)="store.setBottomPanelOpen(!store.bottomPanelOpen())"
+          >
+            {{ store.bottomPanelOpen() ? "Hide" : "Show" }}
+          </button>
+        </div>
+        <form
+          class="flex items-center gap-2"
+          [formGroup]="form"
+          (ngSubmit)="submitPrompt()"
         >
-          Send
-        </button>
-      </form>
+          @let prompt = form.controls.prompt;
+          <input
+            #promptInput
+            class="flex-1 h-10 rounded-md border border-[color:var(--color-border)] bg-black/20 px-3 text-sm"
+            type="text"
+            placeholder="Ask the AI (streaming via SSE)"
+            [formControl]="prompt"
+          />
+          <button
+            class="h-10 px-4 rounded-md border border-[color:var(--color-border)] bg-[color:var(--color-brand)] text-black text-sm font-semibold disabled:opacity-60"
+            type="submit"
+            [disabled]="form.invalid || store.ai().streaming"
+          >
+            Send
+          </button>
+        </form>
 
-      @if (store.ai().output.length > 0) {
-        <pre
-          class="mt-3 text-xs whitespace-pre-wrap font-[family:var(--font-mono)]"
-          >{{ store.ai().output }}</pre
-        >
-      }
+        @if (store.ai().output.length > 0) {
+          <pre
+            class="mt-3 text-xs whitespace-pre-wrap font-[family:var(--font-mono)]"
+            >{{ store.ai().output }}</pre
+          >
+        }
+      </div>
     </section>
   </main>
 </div>

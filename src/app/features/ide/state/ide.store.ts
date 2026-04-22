@@ -41,6 +41,11 @@ export interface IdeFsNode {
 export interface IdeState {
   tabs: IdeTab[];
   activeTabId: string | null;
+  layout: {
+    sidebarWidthPx: number;
+    bottomPanelHeightPx: number;
+    bottomPanelOpen: boolean;
+  };
   explorer: {
     root: IdeFsNode;
     openFolderPaths: string[];
@@ -56,6 +61,11 @@ export interface IdeState {
 interface PersistedIdeStateV1 {
   tabs: IdeTab[];
   activeTabId: string | null;
+  layout: {
+    sidebarWidthPx: number;
+    bottomPanelHeightPx: number;
+    bottomPanelOpen: boolean;
+  };
   explorer: {
     openFolderPaths: string[];
   };
@@ -74,6 +84,11 @@ const initialState: IdeState = {
     },
   ],
   activeTabId: "welcome",
+  layout: {
+    sidebarWidthPx: 288,
+    bottomPanelHeightPx: 220,
+    bottomPanelOpen: true,
+  },
   explorer: {
     root: {
       id: "root",
@@ -122,7 +137,7 @@ function randomId(): string {
 }
 
 function storageKey(): string {
-  return "ide.state.v1";
+  return "ide.state.v2";
 }
 
 function tryParsePersisted(raw: string | null): PersistedIdeStateV1 | null {
@@ -130,6 +145,7 @@ function tryParsePersisted(raw: string | null): PersistedIdeStateV1 | null {
   try {
     const parsed = JSON.parse(raw) as PersistedIdeStateV1;
     if (!parsed || typeof parsed !== "object") return null;
+    if (!parsed.layout) return null;
     return parsed;
   } catch {
     return null;
@@ -171,6 +187,9 @@ export const IdeStore = signalStore(
     ),
     explorerRoot: computed(() => s.explorer().root),
     openFolderPaths: computed(() => new Set(s.explorer().openFolderPaths)),
+    sidebarWidthPx: computed(() => s.layout().sidebarWidthPx),
+    bottomPanelHeightPx: computed(() => s.layout().bottomPanelHeightPx),
+    bottomPanelOpen: computed(() => s.layout().bottomPanelOpen),
   })),
   withMethods((s) => {
     const service = inject(AiService);
@@ -181,6 +200,7 @@ export const IdeStore = signalStore(
       patchState(s, {
         tabs: persisted.tabs,
         activeTabId: persisted.activeTabId,
+        layout: persisted.layout,
         explorer: {
           ...s.explorer(),
           openFolderPaths: persisted.explorer.openFolderPaths,
@@ -193,6 +213,7 @@ export const IdeStore = signalStore(
       const state: PersistedIdeStateV1 = {
         tabs: s.tabs(),
         activeTabId: s.activeTabId(),
+        layout: s.layout(),
         explorer: { openFolderPaths: s.explorer().openFolderPaths },
         ai: { useMock: s.ai().useMock },
       };
@@ -239,6 +260,19 @@ export const IdeStore = signalStore(
     );
 
     return {
+      setSidebarWidthPx(widthPx: number): void {
+        const clamped = Math.min(520, Math.max(200, Math.round(widthPx)));
+        patchState(s, { layout: { ...s.layout(), sidebarWidthPx: clamped } });
+      },
+      setBottomPanelHeightPx(heightPx: number): void {
+        const clamped = Math.min(420, Math.max(120, Math.round(heightPx)));
+        patchState(s, {
+          layout: { ...s.layout(), bottomPanelHeightPx: clamped },
+        });
+      },
+      setBottomPanelOpen(open: boolean): void {
+        patchState(s, { layout: { ...s.layout(), bottomPanelOpen: open } });
+      },
       toggleFolder(path: string): void {
         const node = findNodeByPath(s.explorer().root, path);
         if (!node || !isFolder(node)) return;

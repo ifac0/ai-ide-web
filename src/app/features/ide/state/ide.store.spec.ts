@@ -43,6 +43,30 @@ describe("IdeStore", () => {
     expect(store.activeTab()?.title).toBe("README.md");
   });
 
+  it("clamps layout sizes when set", () => {
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: AI_CLIENT_CONFIG,
+          useValue: { streamUrl: "/api/ai/stream", defaultMockEnabled: true },
+        },
+      ],
+    });
+    const store = TestBed.inject(IdeStore);
+
+    store.setSidebarWidthPx(50);
+    expect(store.sidebarWidthPx()).toBe(200);
+
+    store.setSidebarWidthPx(2000);
+    expect(store.sidebarWidthPx()).toBe(520);
+
+    store.setBottomPanelHeightPx(10);
+    expect(store.bottomPanelHeightPx()).toBe(120);
+
+    store.setBottomPanelHeightPx(2000);
+    expect(store.bottomPanelHeightPx()).toBe(420);
+  });
+
   it("updates active tab value via editorValueChanged rxMethod", () => {
     TestBed.configureTestingModule({
       providers: [

@@ -16,7 +16,7 @@ import {
   ReactiveFormsModule,
   Validators,
 } from "@angular/forms";
-import { fromEvent } from "rxjs";
+import { filter, fromEvent, map, switchMap, takeUntil, tap } from "rxjs";
 
 import { MonacoEditorComponent } from "../../editor/monaco/monaco-editor.component";
 import { IdeStore } from "../state/ide.store";
@@ -53,6 +53,12 @@ export class IdeShellComponent implements AfterViewInit {
   @ViewChild("promptInput")
   private readonly promptInput?: ElementRef<HTMLInputElement>;
 
+  @ViewChild("sidebarResizeHandle")
+  private readonly sidebarResizeHandle?: ElementRef<HTMLElement>;
+
+  @ViewChild("bottomResizeHandle")
+  private readonly bottomResizeHandle?: ElementRef<HTMLElement>;
+
   ngAfterViewInit(): void {
     this.focusMonitor.monitor(this.sidebarToggle);
     this.destroyRef.onDestroy(() => {
@@ -78,6 +84,23 @@ export class IdeShellComponent implements AfterViewInit {
           this.promptInput?.nativeElement.focus();
         }
       });
+
+    if (this.sidebarResizeHandle) {
+      this.bindHorizontalResize(
+        this.sidebarResizeHandle.nativeElement,
+        (dx) => {
+          this.store.setSidebarWidthPx(this.store.sidebarWidthPx() + dx);
+        },
+      );
+    }
+
+    if (this.bottomResizeHandle) {
+      this.bindVerticalResize(this.bottomResizeHandle.nativeElement, (dy) => {
+        this.store.setBottomPanelHeightPx(
+          this.store.bottomPanelHeightPx() - dy,
+        );
+      });
+    }
   }
 
   protected toggleSidebar(): void {
@@ -88,5 +111,43 @@ export class IdeShellComponent implements AfterViewInit {
     if (this.form.invalid) return;
     const prompt = this.form.controls.prompt.value;
     this.store.streamPrompt(prompt);
+  }
+
+  private bindHorizontalResize(
+    handle: HTMLElement,
+    applyDelta: (dx: number) => void,
+  ): void {
+    fromEvent<PointerEvent>(handle, "pointerdown")
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        filter((e) => e.button === 0),
+        tap((e) => handle.setPointerCapture(e.pointerId)),
+        switchMap((start) =>
+          fromEvent<PointerEvent>(this.document, "pointermove").pipe(
+            map((move) => move.clientX - start.clientX),
+            takeUntil(fromEvent(this.document, "pointerup")),
+          ),
+        ),
+      )
+      .subscribe((dx) => applyDelta(dx));
+  }
+
+  private bindVerticalResize(
+    handle: HTMLElement,
+    applyDelta: (dy: number) => void,
+  ): void {
+    fromEvent<PointerEvent>(handle, "pointerdown")
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        filter((e) => e.button === 0),
+        tap((e) => handle.setPointerCapture(e.pointerId)),
+        switchMap((start) =>
+          fromEvent<PointerEvent>(this.document, "pointermove").pipe(
+            map((move) => move.clientY - start.clientY),
+            takeUntil(fromEvent(this.document, "pointerup")),
+          ),
+        ),
+      )
+      .subscribe((dy) => applyDelta(dy));
   }
 }
