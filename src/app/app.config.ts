@@ -13,6 +13,7 @@ import { provideRouter, withInMemoryScrolling } from "@angular/router";
 import { provideServiceWorker } from "@angular/service-worker";
 
 import { routes } from "./app.routes";
+import { environment } from "../environments/environment";
 import { AI_CLIENT_CONFIG } from "./core/ai/ai.config";
 import { provideGlobalErrorHandler } from "./core/errors/provide-global-error-handler";
 import { authInterceptor } from "./core/http/interceptors/auth.interceptor";
@@ -33,13 +34,16 @@ export const appConfig: ApplicationConfig = {
     ),
     {
       provide: AI_CLIENT_CONFIG,
-      useValue: { streamUrl: "/api/ai/stream", defaultMockEnabled: true },
+      useValue: {
+        streamUrl: environment.aiStreamUrl,
+        defaultMockEnabled: !environment.production,
+      },
     },
     {
       provide: TELEMETRY_CONFIG,
       useValue: {
-        enabled: false,
-        endpointUrl: "/api/telemetry",
+        enabled: environment.production,
+        endpointUrl: environment.telemetryUrl,
         sampleRate: 1,
       },
     },
