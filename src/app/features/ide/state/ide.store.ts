@@ -22,8 +22,11 @@ import { AiService, type AiStreamEvent } from "../../../core/ai/ai.service";
 export interface IdeTab {
   id: string;
   title: string;
+  path: string | null;
   language: string;
   value: string;
+  savedValue: string;
+  dirty: boolean;
 }
 
 export type IdeFsNodeKind = "file" | "folder";
@@ -40,6 +43,8 @@ export interface IdeFsNode {
 
 export type CommandId =
   | "tabs.newScratch"
+  | "tabs.closeActive"
+  | "tabs.closeOthers"
   | "ai.toggleMock"
   | "panel.toggleBottom";
 
@@ -90,8 +95,13 @@ export interface IdeState {
   };
 }
 
+type PersistedTab = Pick<
+  IdeTab,
+  "id" | "title" | "path" | "language" | "value" | "savedValue"
+>;
+
 interface PersistedIdeStateV1 {
-  tabs: IdeTab[];
+  tabs: PersistedTab[];
   activeTabId: string | null;
   layout: {
     sidebarWidthPx: number;
@@ -111,8 +121,11 @@ const initialState: IdeState = {
     {
       id: "welcome",
       title: "welcome.ts",
+      path: null,
       language: "typescript",
       value: 'export const welcome = "AI IDE Web";\n',
+      savedValue: 'export const welcome = "AI IDE Web";\n',
+      dirty: false,
     },
   ],
   activeTabId: "welcome",
@@ -222,6 +235,16 @@ function commandItems(): CommandItem[] {
       keywords: "new tab scratch",
     },
     {
+      id: "tabs.closeActive",
+      title: "Close active tab",
+      keywords: "close tab",
+    },
+    {
+      id: "tabs.closeOthers",
+      title: "Close other tabs",
+      keywords: "close others tabs",
+    },
+    {
       id: "ai.toggleMock",
       title: "Toggle mock streaming",
       keywords: "ai mock",
@@ -308,7 +331,10 @@ export const IdeStore = signalStore(
     const persisted = tryParsePersisted(localStorage.getItem(storageKey()));
     if (persisted) {
       patchState(s, {
-        tabs: persisted.tabs,
+        tabs: persisted.tabs.map((t) => ({
+          ...t,
+          dirty: t.value !== t.savedValue,
+        })),
         activeTabId: persisted.activeTabId,
         layout: persisted.layout,
         explorer: {
@@ -321,7 +347,14 @@ export const IdeStore = signalStore(
 
     effect(() => {
       const state: PersistedIdeStateV1 = {
-        tabs: s.tabs(),
+        tabs: s.tabs().map((t) => ({
+          id: t.id,
+          title: t.title,
+          path: t.path,
+          language: t.language,
+          value: t.value,
+          savedValue: t.savedValue,
+        })),
         activeTabId: s.activeTabId(),
         layout: s.layout(),
         explorer: { openFolderPaths: s.explorer().openFolderPaths },
@@ -410,6 +443,16 @@ export const IdeStore = signalStore(
       runCommand(id: CommandId): void {
         if (id === "tabs.newScratch") {
           this.openScratchTab();
+          this.closeCommandPalette();
+          return;
+        }
+        if (id === "tabs.closeActive") {
+          this.closeActiveTab();
+          this.closeCommandPalette();
+          return;
+        }
+        if (id === "tabs.closeOthers") {
+          this.closeOtherTabs();
           this.closeCommandPalette();
           return;
         }
@@ -507,7 +550,7 @@ export const IdeStore = signalStore(
       openFile(path: string): void {
         const node = findNodeByPath(s.explorer().root, path);
         if (!node || !isFile(node)) return;
-        const existing = s.tabs().find((t) => t.title === node.name);
+        const existing = s.tabs().find((t) => t.path === node.path);
         if (existing) {
           patchState(s, { activeTabId: existing.id });
           return;
@@ -517,8 +560,11 @@ export const IdeStore = signalStore(
           tabs: s.tabs().concat({
             id,
             title: node.name,
+            path: node.path,
             language: node.language,
             value: node.value,
+            savedValue: node.value,
+            dirty: false,
           }),
           activeTabId: id,
         });
@@ -543,19 +589,53 @@ export const IdeStore = signalStore(
                 .tabs()
                 .map((t) => (t.id === activeId ? { ...t, value } : t)),
             });
+            patchState(s, {
+              tabs: s
+                .tabs()
+                .map((t) =>
+                  t.id === activeId
+                    ? { ...t, dirty: value !== t.savedValue }
+                    : t,
+                ),
+            });
           }),
         ),
       ),
       openScratchTab(): void {
         const id = randomId();
+        const title = `scratch-${id.slice(0, 4)}.ts`;
         patchState(s, {
           tabs: s.tabs().concat({
             id,
-            title: `scratch-${id.slice(0, 4)}.ts`,
+            title,
+            path: null,
             language: "typescript",
             value: "",
+            savedValue: "",
+            dirty: false,
           }),
           activeTabId: id,
+        });
+      },
+      closeTab(tabId: string): void {
+        const remaining = s.tabs().filter((t) => t.id !== tabId);
+        const nextActive =
+          s.activeTabId() === tabId
+            ? (remaining.at(-1)?.id ?? null)
+            : s.activeTabId();
+        patchState(s, { tabs: remaining, activeTabId: nextActive });
+      },
+      closeActiveTab(): void {
+        const id = s.activeTabId();
+        if (!id) return;
+        this.closeTab(id);
+      },
+      closeOtherTabs(): void {
+        const activeId = s.activeTabId();
+        if (!activeId) return;
+        patchState(s, {
+          tabs: s.tabs().filter((t) => t.id === activeId),
+          activeTabId: activeId,
         });
       },
       setPrompt(prompt: string): void {

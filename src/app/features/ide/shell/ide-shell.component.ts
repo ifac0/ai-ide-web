@@ -105,6 +105,11 @@ export class IdeShellComponent implements AfterViewInit {
           e.preventDefault();
           this.promptInput?.nativeElement.focus();
         }
+
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "w") {
+          e.preventDefault();
+          this.store.closeActiveTab();
+        }
       });
 
     if (this.sidebarResizeHandle) {

@@ -43,6 +43,38 @@ describe("IdeStore", () => {
     expect(store.activeTab()?.title).toBe("README.md");
   });
 
+  it("marks active tab dirty when edited", () => {
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: AI_CLIENT_CONFIG,
+          useValue: { streamUrl: "/api/ai/stream", defaultMockEnabled: true },
+        },
+      ],
+    });
+    const store = TestBed.inject(IdeStore);
+    expect(store.activeTab()?.dirty).toBe(false);
+    store.editorValueChanged("const x = 1;\n");
+    expect(store.activeTab()?.dirty).toBe(true);
+  });
+
+  it("closes active tab and activates last remaining", () => {
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: AI_CLIENT_CONFIG,
+          useValue: { streamUrl: "/api/ai/stream", defaultMockEnabled: true },
+        },
+      ],
+    });
+    const store = TestBed.inject(IdeStore);
+    store.openScratchTab();
+    const active = store.activeTabId();
+    expect(active).not.toBeNull();
+    store.closeActiveTab();
+    expect(store.activeTabId()).not.toBe(active);
+  });
+
   it("clamps layout sizes when set", () => {
     TestBed.configureTestingModule({
       providers: [

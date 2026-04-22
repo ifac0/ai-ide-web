@@ -177,19 +177,36 @@
         <div class="mt-4 text-xs uppercase opacity-70 mb-2">Tabs</div>
         <div class="flex flex-col gap-1">
           @for (tab of store.tabs(); track tab.id) {
-            <button
-              type="button"
-              class="text-left px-2 py-2 rounded-md border border-transparent hover:border-[color:var(--color-border)]"
+            <div
+              class="flex items-center gap-2 px-2 py-2 rounded-md border border-transparent hover:border-[color:var(--color-border)]"
               [ngClass]="
                 store.activeTabId() === tab.id
                   ? 'bg-black/20 border-[color:var(--color-border)]'
                   : ''
               "
-              (click)="store.setActiveTab(tab.id)"
-              [attr.data-testid]="'tab-' + tab.title"
             >
-              <div class="text-sm">{{ tab.title }}</div>
-            </button>
+              <button
+                type="button"
+                class="flex-1 text-left"
+                (click)="store.setActiveTab(tab.id)"
+                [attr.data-testid]="'tab-' + tab.title"
+              >
+                <div class="text-sm flex items-center gap-2">
+                  <span>{{ tab.title }}</span>
+                  @if (tab.dirty) {
+                    <span class="text-[10px] opacity-70">●</span>
+                  }
+                </div>
+              </button>
+              <button
+                type="button"
+                class="h-7 w-7 rounded-md border border-[color:var(--color-border)] text-xs"
+                (click)="store.closeTab(tab.id)"
+                [attr.data-testid]="'close-tab-' + tab.id"
+              >
+                ×
+              </button>
+            </div>
           }
         </div>
 
