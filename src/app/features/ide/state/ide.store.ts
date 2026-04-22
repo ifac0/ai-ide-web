@@ -17,6 +17,10 @@ import {
   tap,
 } from "rxjs";
 
+import {
+  IdePersistenceService,
+  type WorkspaceItem,
+} from "./ide-persistence.service";
 import { AiService, type AiStreamEvent } from "../../../core/ai/ai.service";
 
 export interface IdeTab {
@@ -66,6 +70,11 @@ export interface SearchMatch {
 export interface IdeState {
   tabs: IdeTab[];
   activeTabId: string | null;
+  workspace: {
+    currentId: string;
+    items: WorkspaceItem[];
+    loaded: boolean;
+  };
   layout: {
     sidebarWidthPx: number;
     bottomPanelHeightPx: number;
@@ -137,6 +146,7 @@ const initialState: IdeState = {
     },
   ],
   activeTabId: "welcome",
+  workspace: { currentId: "local", items: [], loaded: false },
   layout: {
     sidebarWidthPx: 288,
     bottomPanelHeightPx: 220,
@@ -212,6 +222,22 @@ function tryParsePersisted(raw: string | null): PersistedIdeStateV1 | null {
   } catch {
     return null;
   }
+}
+
+function isIdeState(input: unknown): input is IdeState {
+  if (!input || typeof input !== "object") return false;
+  const v = input as {
+    tabs?: unknown;
+    layout?: unknown;
+    explorer?: unknown;
+    ai?: unknown;
+  };
+  return (
+    Array.isArray(v.tabs) &&
+    typeof v.layout === "object" &&
+    typeof v.explorer === "object" &&
+    typeof v.ai === "object"
+  );
 }
 
 function isFile(
@@ -305,8 +331,8 @@ function normalizeQuery(q: string): string {
   return q.trim().toLowerCase();
 }
 
-function filteredCommandItems(state: IdeState): CommandItem[] {
-  const q = normalizeQuery(state.ui.commandPalette.query);
+function filteredCommandItems(query: string): CommandItem[] {
+  const q = normalizeQuery(query);
   const items = commandItems();
   if (q.length === 0) return items;
   return items.filter((c) =>
@@ -357,6 +383,9 @@ export const IdeStore = signalStore(
     activeTab: computed(
       () => s.tabs().find((t) => t.id === s.activeTabId()) ?? null,
     ),
+    workspaceLoaded: computed(() => s.workspace().loaded),
+    workspaces: computed(() => s.workspace().items),
+    currentWorkspaceId: computed(() => s.workspace().currentId),
     explorerRoot: computed(() => s.explorer().root),
     openFolderPaths: computed(() => new Set(s.explorer().openFolderPaths)),
     sidebarWidthPx: computed(() => s.layout().sidebarWidthPx),
@@ -368,14 +397,7 @@ export const IdeStore = signalStore(
       () => s.ui().commandPalette.selectedIndex,
     ),
     commandPaletteItems: computed(() => {
-      return filteredCommandItems({
-        tabs: s.tabs(),
-        activeTabId: s.activeTabId(),
-        layout: s.layout(),
-        ui: s.ui(),
-        explorer: s.explorer(),
-        ai: s.ai(),
-      });
+      return filteredCommandItems(s.ui().commandPalette.query);
     }),
     searchOpen: computed(() => s.ui().search.open),
     searchQuery: computed(() => s.ui().search.query),
@@ -384,41 +406,77 @@ export const IdeStore = signalStore(
   })),
   withMethods((s) => {
     const service = inject(AiService);
+    const persistence = inject(IdePersistenceService);
     const cancel$ = new Subject<void>();
 
-    const persisted = tryParsePersisted(localStorage.getItem(storageKey()));
-    if (persisted) {
-      patchState(s, {
-        tabs: persisted.tabs.map((t) => ({
-          ...t,
-          dirty: t.value !== t.savedValue,
-        })),
-        activeTabId: persisted.activeTabId,
-        layout: persisted.layout,
-        explorer: {
-          ...s.explorer(),
-          openFolderPaths: persisted.explorer.openFolderPaths,
+    const snapshot = (): IdeState => ({
+      tabs: s.tabs(),
+      activeTabId: s.activeTabId(),
+      workspace: s.workspace(),
+      layout: s.layout(),
+      ui: s.ui(),
+      explorer: s.explorer(),
+      ai: s.ai(),
+    });
+
+    const snapshotForPersistence = (): IdeState => {
+      const state = snapshot();
+      return {
+        ...state,
+        workspace: {
+          ...state.workspace,
+          items: [],
         },
-        ai: { ...s.ai(), useMock: persisted.ai.useMock },
-      });
-    }
+      };
+    };
+
+    const hydrate = rxMethod<void>((trigger$) =>
+      trigger$.pipe(
+        switchMap(async () => {
+          const index = await persistence.loadWorkspaceIndex();
+          const currentId = index.currentWorkspaceId;
+          const loaded = await persistence.loadIdeState(currentId);
+
+          patchState(s, {
+            workspace: { currentId, items: index.workspaces, loaded: true },
+          });
+
+          if (isIdeState(loaded)) {
+            patchState(s, loaded);
+            return;
+          }
+
+          const legacy = tryParsePersisted(localStorage.getItem(storageKey()));
+          if (legacy) {
+            patchState(s, {
+              tabs: legacy.tabs.map((t) => ({
+                ...t,
+                dirty: t.value !== t.savedValue,
+              })),
+              activeTabId: legacy.activeTabId,
+              layout: legacy.layout,
+              explorer: {
+                ...s.explorer(),
+                openFolderPaths: legacy.explorer.openFolderPaths,
+              },
+              ai: { ...s.ai(), useMock: legacy.ai.useMock },
+            });
+            await persistence.saveIdeState(currentId, snapshotForPersistence());
+          } else {
+            await persistence.saveIdeState(currentId, snapshotForPersistence());
+          }
+        }),
+      ),
+    );
+
+    hydrate();
 
     effect(() => {
-      const state: PersistedIdeStateV1 = {
-        tabs: s.tabs().map((t) => ({
-          id: t.id,
-          title: t.title,
-          path: t.path,
-          language: t.language,
-          value: t.value,
-          savedValue: t.savedValue,
-        })),
-        activeTabId: s.activeTabId(),
-        layout: s.layout(),
-        explorer: { openFolderPaths: s.explorer().openFolderPaths },
-        ai: { useMock: s.ai().useMock },
-      };
-      localStorage.setItem(storageKey(), JSON.stringify(state));
+      if (!s.workspace().loaded) return;
+      void persistence.saveIdeState(
+        s.workspace().currentId,
+        snapshotForPersistence(),
+      );
     });
 
     const onAiEvent = (evt: AiStreamEvent): void => {
@@ -475,6 +533,42 @@ export const IdeStore = signalStore(
     );
 
     return {
+      createWorkspace(name: string): void {
+        void (async () => {
+          const ws = await persistence.createWorkspace(name);
+          const index = await persistence.loadWorkspaceIndex();
+          patchState(s, {
+            workspace: {
+              ...s.workspace(),
+              currentId: ws.id,
+              items: index.workspaces,
+              loaded: true,
+            },
+          });
+          patchState(s, initialState);
+        })();
+      },
+      switchWorkspace(id: string): void {
+        void (async () => {
+          await persistence.setCurrentWorkspace(id);
+          const index = await persistence.loadWorkspaceIndex();
+          const loaded = await persistence.loadIdeState(id);
+          patchState(s, {
+            workspace: {
+              ...s.workspace(),
+              currentId: id,
+              items: index.workspaces,
+              loaded: true,
+            },
+          });
+          if (isIdeState(loaded)) {
+            patchState(s, loaded);
+          } else {
+            patchState(s, initialState);
+            await persistence.saveIdeState(id, snapshotForPersistence());
+          }
+        })();
+      },
       setSidebarWidthPx(widthPx: number): void {
         const clamped = Math.min(520, Math.max(200, Math.round(widthPx)));
         patchState(s, { layout: { ...s.layout(), sidebarWidthPx: clamped } });
@@ -522,14 +616,7 @@ export const IdeStore = signalStore(
         });
       },
       selectCommandPaletteIndex(index: number): void {
-        const items = filteredCommandItems({
-          tabs: s.tabs(),
-          activeTabId: s.activeTabId(),
-          layout: s.layout(),
-          ui: s.ui(),
-          explorer: s.explorer(),
-          ai: s.ai(),
-        });
+        const items = filteredCommandItems(s.ui().commandPalette.query);
         const clamped = Math.min(
           Math.max(0, Math.floor(index)),
           Math.max(0, items.length - 1),
@@ -545,14 +632,7 @@ export const IdeStore = signalStore(
         });
       },
       runSelectedCommand(): void {
-        const items = filteredCommandItems({
-          tabs: s.tabs(),
-          activeTabId: s.activeTabId(),
-          layout: s.layout(),
-          ui: s.ui(),
-          explorer: s.explorer(),
-          ai: s.ai(),
-        });
+        const items = filteredCommandItems(s.ui().commandPalette.query);
         const idx = s.ui().commandPalette.selectedIndex;
         const item = items[idx];
         if (!item) return;
@@ -873,6 +953,7 @@ export const IdeStore = signalStore(
       cancelStream,
       streamPrompt,
       onAiEvent,
+      hydrate,
     };
   }),
 );

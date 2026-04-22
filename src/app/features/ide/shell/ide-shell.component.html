@@ -151,6 +151,25 @@
       </button>
       @if (!sidebarCollapsed) {
         <div class="text-sm font-semibold tracking-wide">AI IDE</div>
+        <div class="flex-1"></div>
+        <select
+          class="h-9 rounded-md border border-[color:var(--color-border)] bg-black/20 px-2 text-xs"
+          [value]="store.currentWorkspaceId()"
+          (change)="store.switchWorkspace($any($event.target).value)"
+          data-testid="workspace-select"
+        >
+          @for (ws of store.workspaces(); track ws.id) {
+            <option [value]="ws.id">{{ ws.name }}</option>
+          }
+        </select>
+        <button
+          type="button"
+          class="h-9 px-3 rounded-md border border-[color:var(--color-border)] text-xs"
+          (click)="store.createWorkspace('New workspace')"
+          data-testid="new-workspace"
+        >
+          New
+        </button>
       }
     </div>
 
