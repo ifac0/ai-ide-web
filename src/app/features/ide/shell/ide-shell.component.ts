@@ -78,6 +78,7 @@ export class IdeShellComponent implements AfterViewInit {
           this.store.cancelStream();
           this.store.closeCommandPalette();
           this.store.closeSearch();
+          this.store.clearCrash();
           return;
         }
 
@@ -111,6 +112,10 @@ export class IdeShellComponent implements AfterViewInit {
           this.store.closeActiveTab();
         }
       });
+
+    fromEvent<CustomEvent<{ message: string }>>(window, "app-error")
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((e) => this.store.setCrash(e.detail.message));
 
     if (this.sidebarResizeHandle) {
       this.bindHorizontalResize(

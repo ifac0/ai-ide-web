@@ -3,6 +3,43 @@
   [style.gridTemplateColumns]="' ' + store.sidebarWidthPx() + 'px 1fr'"
   data-testid="ide-root"
 >
+  @if (store.ui().crash.open) {
+    <div
+      class="fixed inset-0 bg-black/70 flex items-center justify-center z-[60]"
+      (click)="store.clearCrash()"
+      data-testid="crash-overlay"
+    >
+      <div
+        class="w-[min(720px,calc(100vw-24px))] rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-panel)] shadow-[var(--shadow-md)]"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="p-4 border-b border-[color:var(--color-border)]">
+          <div class="text-sm font-semibold">Something went wrong</div>
+          <div class="text-xs opacity-70 mt-1">
+            {{ store.ui().crash.message }}
+          </div>
+        </div>
+        <div class="p-4 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            class="h-9 px-3 rounded-md border border-[color:var(--color-border)] text-xs"
+            (click)="store.resetCurrentWorkspace()"
+            data-testid="reset-workspace"
+          >
+            Reset workspace
+          </button>
+          <button
+            type="button"
+            class="h-9 px-3 rounded-md border border-[color:var(--color-border)] text-xs"
+            (click)="store.clearCrash()"
+            data-testid="close-crash"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  }
   @if (store.commandPaletteOpen()) {
     <div
       class="fixed inset-0 bg-black/50 flex items-start justify-center pt-24 z-50"

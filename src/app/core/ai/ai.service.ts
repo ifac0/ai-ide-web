@@ -15,11 +15,13 @@ import {
   retry,
   scan,
   share,
+  tap,
   Observable,
 } from "rxjs";
 
 import { AI_CLIENT_CONFIG } from "./ai.config";
 import { LoggerService } from "../logging/logger.service";
+import { PerfService } from "../observability/perf.service";
 import { createTokenBucketRateLimiter } from "../rate-limit/rate-limiter";
 
 export interface AiStreamDelta {
@@ -79,6 +81,7 @@ export class AiService {
   private readonly http = inject(HttpClient);
   private readonly config = inject(AI_CLIENT_CONFIG);
   private readonly logger = inject(LoggerService);
+  private readonly perf = inject(PerfService);
   private readonly limiter = createTokenBucketRateLimiter({
     capacity: 3,
     refillPerSecond: 0.5,
@@ -93,7 +96,7 @@ export class AiService {
 
   streamCompletion(
     prompt: string,
-    options?: { mock?: boolean },
+    options?: { mock?: boolean; requestId?: string },
   ): Observable<AiStreamEvent> {
     if (!this.limiter.tryRemoveToken()) {
       this.logger.warn("ai.stream.rate_limited");
@@ -102,7 +105,8 @@ export class AiService {
 
     const mockEnabled = options?.mock ?? this.config.defaultMockEnabled;
     const headers = mockEnabled ? { "x-mock-ai": "1" } : undefined;
-    const requestId = crypto.randomUUID();
+    const requestId = options?.requestId ?? crypto.randomUUID();
+    this.perf.mark(`ai.stream.start.${requestId}`);
 
     const http$ = this.http
       .request("POST", this.config.streamUrl, {
@@ -199,6 +203,11 @@ export class AiService {
       catchError((err: unknown) => {
         this.logger.error("ai.stream.error", { requestId, err });
         return of<AiStreamEvent>({ done: true });
+      }),
+      tap({
+        complete: () => {
+          this.perf.mark(`ai.stream.end.${requestId}`);
+        },
       }),
       share(),
     );

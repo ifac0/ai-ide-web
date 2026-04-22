@@ -11,6 +11,8 @@ import {
   inject,
 } from "@angular/core";
 
+import { PerfService } from "../../../core/observability/perf.service";
+
 interface Disposable {
   dispose(): void;
 }
@@ -73,6 +75,7 @@ export class MonacoEditorComponent implements AfterViewInit {
   @Output() valueChange = new EventEmitter<string>();
 
   private readonly destroyRef = inject(DestroyRef);
+  private readonly perf = inject(PerfService);
 
   private static loaderPromise: Promise<void> | null = null;
 
@@ -80,7 +83,8 @@ export class MonacoEditorComponent implements AfterViewInit {
   private model: MonacoTextModel | null = null;
 
   ngAfterViewInit(): void {
-    void this.init();
+    this.perf.mark("monaco.init.start");
+    void this.init().finally(() => this.perf.mark("monaco.init.end"));
   }
 
   private async init(): Promise<void> {

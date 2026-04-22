@@ -35,7 +35,7 @@ export class TelemetryService {
     refillPerSecond: 1,
   });
 
-  captureError(input: unknown): void {
+  captureError(input: unknown, context?: { requestId?: string }): void {
     if (!this.config.enabled) return;
     if (!shouldSample(this.config.sampleRate)) return;
     if (!this.limiter.tryRemoveToken()) {
@@ -43,11 +43,14 @@ export class TelemetryService {
       return;
     }
 
-    const event = this.toErrorEvent(input);
+    const event = this.toErrorEvent(input, context);
     this.send(event);
   }
 
-  private toErrorEvent(input: unknown): TelemetryErrorEvent {
+  private toErrorEvent(
+    input: unknown,
+    context?: { requestId?: string },
+  ): TelemetryErrorEvent {
     const normalized = this.normalizeError(input);
     return {
       type: "error",
@@ -58,6 +61,7 @@ export class TelemetryService {
       url: typeof location !== "undefined" ? location.href : undefined,
       userAgent:
         typeof navigator !== "undefined" ? navigator.userAgent : undefined,
+      requestId: context?.requestId,
     };
   }
 

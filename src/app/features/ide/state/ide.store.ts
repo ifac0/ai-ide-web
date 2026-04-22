@@ -93,6 +93,10 @@ export interface IdeState {
       results: SearchMatch[];
       selectedIndex: number;
     };
+    crash: {
+      open: boolean;
+      message: string;
+    };
   };
   explorer: {
     root: IdeFsNode;
@@ -103,6 +107,7 @@ export interface IdeState {
     streaming: boolean;
     output: string;
     useMock: boolean;
+    requestId: string | null;
     history: {
       id: string;
       at: string;
@@ -155,6 +160,7 @@ const initialState: IdeState = {
   ui: {
     commandPalette: { open: false, query: "", selectedIndex: 0, recent: [] },
     search: { open: false, query: "", results: [], selectedIndex: 0 },
+    crash: { open: false, message: "" },
   },
   explorer: {
     root: {
@@ -196,6 +202,7 @@ const initialState: IdeState = {
     streaming: false,
     output: "",
     useMock: true,
+    requestId: null,
     history: [],
   },
 };
@@ -505,19 +512,23 @@ export const IdeStore = signalStore(
         map((prompt) => prompt.trim()),
         filter((p) => p.length > 0),
         tap(() => cancel$.next()),
-        tap((prompt) =>
+        map((prompt) => ({ prompt, requestId: randomId() })),
+        tap(({ prompt, requestId }) =>
           patchState(s, {
-            ai: { ...s.ai(), prompt, streaming: true, output: "" },
+            ai: { ...s.ai(), prompt, requestId, streaming: true, output: "" },
+            ui: { ...s.ui(), crash: { open: false, message: "" } },
           }),
         ),
-        switchMap((prompt) =>
-          service.streamCompletion(prompt, { mock: s.ai().useMock }).pipe(
-            tap(onAiEvent),
-            takeUntil(cancel$),
-            finalize(() =>
-              patchState(s, { ai: { ...s.ai(), streaming: false } }),
+        switchMap(({ prompt, requestId }) =>
+          service
+            .streamCompletion(prompt, { mock: s.ai().useMock, requestId })
+            .pipe(
+              tap(onAiEvent),
+              takeUntil(cancel$),
+              finalize(() =>
+                patchState(s, { ai: { ...s.ai(), streaming: false } }),
+              ),
             ),
-          ),
         ),
       ),
     );
@@ -533,6 +544,24 @@ export const IdeStore = signalStore(
     );
 
     return {
+      setCrash(message: string): void {
+        patchState(s, { ui: { ...s.ui(), crash: { open: true, message } } });
+      },
+      clearCrash(): void {
+        patchState(s, {
+          ui: { ...s.ui(), crash: { open: false, message: "" } },
+        });
+      },
+      resetCurrentWorkspace(): void {
+        void (async () => {
+          const id = s.workspace().currentId;
+          await persistence.resetWorkspace(id);
+          patchState(s, initialState);
+          patchState(s, {
+            workspace: { ...s.workspace(), currentId: id, loaded: true },
+          });
+        })();
+      },
       createWorkspace(name: string): void {
         void (async () => {
           const ws = await persistence.createWorkspace(name);

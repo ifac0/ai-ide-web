@@ -33,7 +33,7 @@ function nowIso(): string {
 }
 
 function dbConfig(): IndexedDbConfig {
-  return { dbName: "ai-ide-web", version: 1 };
+  return { dbName: "ai-ide-web", version: 2 };
 }
 
 function ensureSchema(db: IDBDatabase): void {
@@ -58,6 +58,7 @@ export class IdePersistenceService {
       dbConfig(),
       "workspaces",
       "index",
+      ensureSchema,
     );
     if (existing) return existing;
 
@@ -120,6 +121,7 @@ export class IdePersistenceService {
       dbConfig(),
       "ide",
       workspaceId,
+      ensureSchema,
     );
     return doc?.state ?? null;
   }
@@ -133,5 +135,9 @@ export class IdePersistenceService {
       state,
     };
     await this.idb.put(dbConfig(), "ide", workspaceId, doc, ensureSchema);
+  }
+
+  async resetWorkspace(workspaceId: string): Promise<void> {
+    await this.idb.delete(dbConfig(), "ide", workspaceId, ensureSchema);
   }
 }

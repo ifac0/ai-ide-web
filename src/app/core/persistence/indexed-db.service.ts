@@ -38,12 +38,9 @@ export class IndexedDbService {
     config: IndexedDbConfig,
     storeName: string,
     key: IDBValidKey,
+    ensureSchema: Upgrade,
   ): Promise<T | null> {
-    const db = await openDb(config, (db2) => {
-      if (!db2.objectStoreNames.contains(storeName)) {
-        db2.createObjectStore(storeName);
-      }
-    });
+    const db = await openDb(config, ensureSchema);
     try {
       const tx = db.transaction(storeName, "readonly");
       const store = tx.objectStore(storeName);
