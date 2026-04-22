@@ -1,4 +1,4 @@
-export default {
+module.exports = {
   content: ["./src/**/*.{html,ts}"],
   theme: {
     extend: {
@@ -10,25 +10,24 @@ export default {
         brand: "var(--color-brand)",
         danger: "var(--color-danger)",
         warning: "var(--color-warning)",
-        success: "var(--color-success)"
+        success: "var(--color-success)",
       },
       borderRadius: {
         xs: "var(--radius-xs)",
         sm: "var(--radius-sm)",
         md: "var(--radius-md)",
-        lg: "var(--radius-lg)"
+        lg: "var(--radius-lg)",
       },
       boxShadow: {
         sm: "var(--shadow-sm)",
         md: "var(--shadow-md)",
-        lg: "var(--shadow-lg)"
+        lg: "var(--shadow-lg)",
       },
       fontFamily: {
         sans: "var(--font-sans)",
-        mono: "var(--font-mono)"
-      }
-    }
+        mono: "var(--font-mono)",
+      },
+    },
   },
-  plugins: []
+  plugins: [],
 };
-
