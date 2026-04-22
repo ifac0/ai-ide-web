@@ -34,10 +34,14 @@ docker run --rm -p 8080:80 ai-ide-web
 
 Open `http://localhost:8080`.
 
+## Deploy (Vercel)
+
+- Create a new project on Vercel and import this repo.
+- Set:
+  - Build Command: `npm run build:prod`
+  - Output Directory: `dist/ai-ide-web/browser`
+- This repo includes `vercel.json` for SPA rewrites and baseline security headers.
+
 ## Deploy (Cloudflare Pages)
 
-This repo includes `public/_headers` and `public/_redirects` for Cloudflare Pages.
-
-```bash
-npm run deploy:pages
-```
+Cloudflare Pages config is also included (`public/_headers`, `public/_redirects`, `wrangler.toml`).
