@@ -1,6 +1,4 @@
-import type { Config } from "jest";
-
-const config: Config = {
+module.exports = {
   preset: "jest-preset-angular",
   testEnvironment: "jsdom",
   setupFilesAfterEnv: ["<rootDir>/src/test-setup.ts"],
@@ -18,7 +16,6 @@ const config: Config = {
   collectCoverageFrom: [
     "<rootDir>/src/**/*.ts",
     "!<rootDir>/src/main.ts",
-    "!<rootDir>/src/polyfills.ts",
     "!<rootDir>/src/**/*.d.ts",
   ],
   coveragePathIgnorePatterns: [
@@ -27,7 +24,6 @@ const config: Config = {
     "/src/environments/",
   ],
   testPathIgnorePatterns: ["/node_modules/", "/dist/", "/e2e/"],
+  modulePathIgnorePatterns: ["<rootDir>/ai-ide-web-tmp/"],
   reporters: ["default"],
 };
-
-export default config;

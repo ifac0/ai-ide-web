@@ -52,6 +52,10 @@ interface AmdRequire {
   ): void;
 }
 
+interface MonacoEnvironmentGlobal {
+  getWorkerUrl(moduleId: string, label: string): string;
+}
+
 @Component({
   selector: "app-monaco-editor",
   standalone: true,
@@ -114,6 +118,8 @@ export class MonacoEditorComponent implements AfterViewInit {
       return;
     }
 
+    this.setMonacoEnvironment();
+
     MonacoEditorComponent.loaderPromise = new Promise<void>(
       (resolve, reject) => {
         const script = document.createElement("script");
@@ -136,6 +142,28 @@ export class MonacoEditorComponent implements AfterViewInit {
     );
 
     await MonacoEditorComponent.loaderPromise;
+  }
+
+  private setMonacoEnvironment(): void {
+    const w = window as unknown as {
+      MonacoEnvironment?: MonacoEnvironmentGlobal;
+    };
+    if (w.MonacoEnvironment) return;
+
+    const origin = window.location.origin;
+    const workerMain = `${origin}/assets/monaco/vs/base/worker/workerMain.js`;
+    const baseUrl = `${origin}/assets/monaco/`;
+
+    w.MonacoEnvironment = {
+      getWorkerUrl: (_moduleId: string, _label: string) => {
+        const code = [
+          `self.MonacoEnvironment={baseUrl:${JSON.stringify(baseUrl)}};`,
+          `importScripts(${JSON.stringify(workerMain)});`,
+        ].join("");
+
+        return `data:text/javascript;charset=utf-8,${encodeURIComponent(code)}`;
+      },
+    };
   }
 
   private getAmdRequire(): AmdRequire {
