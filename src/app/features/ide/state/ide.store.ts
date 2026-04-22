@@ -75,6 +75,8 @@ export interface IdeState {
     commandPalette: {
       open: boolean;
       query: string;
+      selectedIndex: number;
+      recent: CommandId[];
     };
     search: {
       open: boolean;
@@ -135,7 +137,7 @@ const initialState: IdeState = {
     bottomPanelOpen: true,
   },
   ui: {
-    commandPalette: { open: false, query: "" },
+    commandPalette: { open: false, query: "", selectedIndex: 0, recent: [] },
     search: { open: false, query: "", results: [], selectedIndex: 0 },
   },
   explorer: {
@@ -227,6 +229,37 @@ function findNodeByPath(node: IdeFsNode, path: string): IdeFsNode | null {
   return null;
 }
 
+function updateNodeByPath(
+  node: IdeFsNode,
+  path: string,
+  update: (n: IdeFsNode) => IdeFsNode,
+): IdeFsNode {
+  if (node.path === path) return update(node);
+  if (!node.children) return node;
+  const children = node.children.map((c) => updateNodeByPath(c, path, update));
+  return { ...node, children };
+}
+
+function removeNodeByPath(node: IdeFsNode, path: string): IdeFsNode {
+  if (!node.children) return node;
+  const children = node.children
+    .filter((c) => c.path !== path)
+    .map((c) => removeNodeByPath(c, path));
+  return { ...node, children };
+}
+
+function ensureFolderChild(
+  root: IdeFsNode,
+  parentPath: string,
+  child: IdeFsNode,
+): IdeFsNode {
+  return updateNodeByPath(root, parentPath, (n) => {
+    if (!isFolder(n)) return n;
+    const children = (n.children ?? []).concat(child);
+    return { ...n, children };
+  });
+}
+
 function commandItems(): CommandItem[] {
   return [
     {
@@ -259,6 +292,15 @@ function commandItems(): CommandItem[] {
 
 function normalizeQuery(q: string): string {
   return q.trim().toLowerCase();
+}
+
+function filteredCommandItems(state: IdeState): CommandItem[] {
+  const q = normalizeQuery(state.ui.commandPalette.query);
+  const items = commandItems();
+  if (q.length === 0) return items;
+  return items.filter((c) =>
+    `${c.title} ${c.keywords}`.toLowerCase().includes(q),
+  );
 }
 
 function findAllMatches(input: string, query: string): number[] {
@@ -311,13 +353,18 @@ export const IdeStore = signalStore(
     bottomPanelOpen: computed(() => s.layout().bottomPanelOpen),
     commandPaletteOpen: computed(() => s.ui().commandPalette.open),
     commandPaletteQuery: computed(() => s.ui().commandPalette.query),
+    commandPaletteSelectedIndex: computed(
+      () => s.ui().commandPalette.selectedIndex,
+    ),
     commandPaletteItems: computed(() => {
-      const q = normalizeQuery(s.ui().commandPalette.query);
-      const items = commandItems();
-      if (q.length === 0) return items;
-      return items.filter((c) =>
-        `${c.title} ${c.keywords}`.toLowerCase().includes(q),
-      );
+      return filteredCommandItems({
+        tabs: s.tabs(),
+        activeTabId: s.activeTabId(),
+        layout: s.layout(),
+        ui: s.ui(),
+        explorer: s.explorer(),
+        ai: s.ai(),
+      });
     }),
     searchOpen: computed(() => s.ui().search.open),
     searchQuery: computed(() => s.ui().search.query),
@@ -420,7 +467,12 @@ export const IdeStore = signalStore(
         patchState(s, {
           ui: {
             ...s.ui(),
-            commandPalette: { open: true, query: "" },
+            commandPalette: {
+              ...s.ui().commandPalette,
+              open: true,
+              query: "",
+              selectedIndex: 0,
+            },
           },
         });
       },
@@ -436,11 +488,61 @@ export const IdeStore = signalStore(
         patchState(s, {
           ui: {
             ...s.ui(),
-            commandPalette: { ...s.ui().commandPalette, query },
+            commandPalette: {
+              ...s.ui().commandPalette,
+              query,
+              selectedIndex: 0,
+            },
           },
         });
       },
+      selectCommandPaletteIndex(index: number): void {
+        const items = filteredCommandItems({
+          tabs: s.tabs(),
+          activeTabId: s.activeTabId(),
+          layout: s.layout(),
+          ui: s.ui(),
+          explorer: s.explorer(),
+          ai: s.ai(),
+        });
+        const clamped = Math.min(
+          Math.max(0, Math.floor(index)),
+          Math.max(0, items.length - 1),
+        );
+        patchState(s, {
+          ui: {
+            ...s.ui(),
+            commandPalette: {
+              ...s.ui().commandPalette,
+              selectedIndex: clamped,
+            },
+          },
+        });
+      },
+      runSelectedCommand(): void {
+        const items = filteredCommandItems({
+          tabs: s.tabs(),
+          activeTabId: s.activeTabId(),
+          layout: s.layout(),
+          ui: s.ui(),
+          explorer: s.explorer(),
+          ai: s.ai(),
+        });
+        const idx = s.ui().commandPalette.selectedIndex;
+        const item = items[idx];
+        if (!item) return;
+        this.runCommand(item.id);
+      },
       runCommand(id: CommandId): void {
+        const recent = [id]
+          .concat(s.ui().commandPalette.recent.filter((x) => x !== id))
+          .slice(0, 8);
+        patchState(s, {
+          ui: {
+            ...s.ui(),
+            commandPalette: { ...s.ui().commandPalette, recent },
+          },
+        });
         if (id === "tabs.newScratch") {
           this.openScratchTab();
           this.closeCommandPalette();
@@ -640,6 +742,99 @@ export const IdeStore = signalStore(
       },
       setPrompt(prompt: string): void {
         patchState(s, { ai: { ...s.ai(), prompt } });
+      },
+      createFile(parentPath: string, name: string): void {
+        const trimmed = name.trim();
+        if (trimmed.length === 0) return;
+        const parent = findNodeByPath(s.explorer().root, parentPath);
+        if (!parent || !isFolder(parent)) return;
+        const path =
+          parentPath === "/" ? `/${trimmed}` : `${parentPath}/${trimmed}`;
+        const file: IdeFsNode = {
+          id: randomId(),
+          kind: "file",
+          name: trimmed,
+          path,
+          language: trimmed.endsWith(".md")
+            ? "markdown"
+            : trimmed.endsWith(".ts")
+              ? "typescript"
+              : "plaintext",
+          value: "",
+        };
+        patchState(s, {
+          explorer: {
+            ...s.explorer(),
+            root: ensureFolderChild(s.explorer().root, parentPath, file),
+          },
+        });
+      },
+      createFolder(parentPath: string, name: string): void {
+        const trimmed = name.trim();
+        if (trimmed.length === 0) return;
+        const parent = findNodeByPath(s.explorer().root, parentPath);
+        if (!parent || !isFolder(parent)) return;
+        const path =
+          parentPath === "/" ? `/${trimmed}` : `${parentPath}/${trimmed}`;
+        const folder: IdeFsNode = {
+          id: randomId(),
+          kind: "folder",
+          name: trimmed,
+          path,
+          children: [],
+        };
+        patchState(s, {
+          explorer: {
+            ...s.explorer(),
+            root: ensureFolderChild(s.explorer().root, parentPath, folder),
+          },
+        });
+      },
+      renameNode(path: string, newName: string): void {
+        const trimmed = newName.trim();
+        if (trimmed.length === 0) return;
+        const node = findNodeByPath(s.explorer().root, path);
+        if (!node) return;
+        const parentPath = path.split("/").slice(0, -1).join("/") || "/";
+        const nextPath =
+          parentPath === "/" ? `/${trimmed}` : `${parentPath}/${trimmed}`;
+        patchState(s, {
+          explorer: {
+            ...s.explorer(),
+            root: updateNodeByPath(s.explorer().root, path, (n) => ({
+              ...n,
+              name: trimmed,
+              path: nextPath,
+            })),
+          },
+        });
+        patchState(s, {
+          tabs: s
+            .tabs()
+            .map((t) =>
+              t.path === path ? { ...t, title: trimmed, path: nextPath } : t,
+            ),
+        });
+      },
+      deleteNode(path: string): void {
+        patchState(s, {
+          explorer: {
+            ...s.explorer(),
+            root: removeNodeByPath(s.explorer().root, path),
+            openFolderPaths: s
+              .explorer()
+              .openFolderPaths.filter(
+                (p) => p !== path && !p.startsWith(`${path}/`),
+              ),
+          },
+        });
+        patchState(s, { tabs: s.tabs().filter((t) => t.path !== path) });
+        if (
+          s.activeTabId() &&
+          !s.tabs().some((t) => t.id === s.activeTabId())
+        ) {
+          patchState(s, { activeTabId: s.tabs().at(-1)?.id ?? null });
+        }
       },
       setUseMock(useMock: boolean): void {
         patchState(s, { ai: { ...s.ai(), useMock } });

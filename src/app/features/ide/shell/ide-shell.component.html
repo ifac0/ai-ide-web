@@ -20,6 +20,17 @@
             type="text"
             placeholder="Type a command…"
             [value]="store.commandPaletteQuery()"
+            (keydown.arrowdown)="
+              store.selectCommandPaletteIndex(
+                store.commandPaletteSelectedIndex() + 1
+              )
+            "
+            (keydown.arrowup)="
+              store.selectCommandPaletteIndex(
+                store.commandPaletteSelectedIndex() - 1
+              )
+            "
+            (keydown.enter)="store.runSelectedCommand()"
             (input)="store.setCommandPaletteQuery($any($event.target).value)"
             data-testid="command-palette-input"
           />
@@ -29,6 +40,17 @@
             <button
               type="button"
               class="w-full text-left px-3 py-2 rounded-md hover:bg-white/10"
+              [ngClass]="
+                store.commandPaletteItems().indexOf(cmd) ===
+                store.commandPaletteSelectedIndex()
+                  ? 'bg-white/10'
+                  : ''
+              "
+              (mouseenter)="
+                store.selectCommandPaletteIndex(
+                  store.commandPaletteItems().indexOf(cmd)
+                )
+              "
               (click)="store.runCommand(cmd.id)"
               [attr.data-testid]="'command-' + cmd.id"
             >
@@ -60,6 +82,13 @@
             type="text"
             placeholder="Search in open tabs…"
             [value]="store.searchQuery()"
+            (keydown.arrowdown)="
+              store.selectSearchResult(store.searchSelectedIndex() + 1)
+            "
+            (keydown.arrowup)="
+              store.selectSearchResult(store.searchSelectedIndex() - 1)
+            "
+            (keydown.enter)="store.activateSelectedSearchResult()"
             (input)="store.setSearchQuery($any($event.target).value)"
             data-testid="search-input"
           />
@@ -128,6 +157,24 @@
     @if (!sidebarCollapsed) {
       <div class="p-2">
         <div class="text-xs uppercase opacity-70 mb-2">Files</div>
+        <div class="mb-2 flex items-center gap-2">
+          <button
+            type="button"
+            class="h-8 px-3 rounded-md border border-[color:var(--color-border)] text-xs"
+            (click)="store.createFile('/src', 'new.ts')"
+            data-testid="new-file"
+          >
+            New file
+          </button>
+          <button
+            type="button"
+            class="h-8 px-3 rounded-md border border-[color:var(--color-border)] text-xs"
+            (click)="store.createFolder('/src', 'new-folder')"
+            data-testid="new-folder"
+          >
+            New folder
+          </button>
+        </div>
         @let openFolders = store.openFolderPaths();
         <div class="flex flex-col gap-1">
           @for (node of store.explorerRoot().children ?? []; track node.id) {
