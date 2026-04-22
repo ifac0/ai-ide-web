@@ -21,7 +21,9 @@
     "prepare": "husky",
     "doc": "compodoc -p tsconfig.json -s -r 4201 --silent",
     "doc:build": "compodoc -p tsconfig.json -d ./documentation --silent",
-    "commitlint": "commitlint --from=HEAD~1"
+    "commitlint": "commitlint --from=HEAD~1",
+    "deploy:pages:build": "npm run build:prod",
+    "deploy:pages": "npm run deploy:pages:build && npx wrangler pages deploy dist/ai-ide-web/browser"
   },
   "dependencies": {
     "@angular/animations": "^21.0.0",

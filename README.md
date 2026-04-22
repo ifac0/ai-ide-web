@@ -33,3 +33,11 @@ docker run --rm -p 8080:80 ai-ide-web
 ```
 
 Open `http://localhost:8080`.
+
+## Deploy (Cloudflare Pages)
+
+This repo includes `public/_headers` and `public/_redirects` for Cloudflare Pages.
+
+```bash
+npm run deploy:pages
+```
