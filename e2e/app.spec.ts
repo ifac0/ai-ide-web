@@ -22,6 +22,24 @@ test("command palette opens and creates scratch tab", async ({ page }) => {
   await expect(page.getByTestId("command-palette-overlay")).toHaveCount(0);
 });
 
+test("command palette supports keyboard navigation and escape", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  await page.keyboard.press("Meta+P");
+  await expect(page.getByTestId("command-palette-overlay")).toBeVisible();
+
+  await page.getByTestId("command-palette-input").press("ArrowDown");
+  await page.getByTestId("command-palette-input").press("Enter");
+  await expect(page.getByTestId("command-palette-overlay")).toHaveCount(0);
+
+  await page.keyboard.press("Meta+P");
+  await expect(page.getByTestId("command-palette-overlay")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("command-palette-overlay")).toHaveCount(0);
+});
+
 test("search opens and activates a result tab", async ({ page }) => {
   await page.goto("/");
 
