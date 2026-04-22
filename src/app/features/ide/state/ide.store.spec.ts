@@ -121,4 +121,47 @@ describe("IdeStore", () => {
 
     expect(store.ai().streaming).toBe(false);
   });
+
+  it("opens command palette and runs new scratch tab command", () => {
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: AI_CLIENT_CONFIG,
+          useValue: { streamUrl: "/api/ai/stream", defaultMockEnabled: true },
+        },
+      ],
+    });
+
+    const store = TestBed.inject(IdeStore);
+    const before = store.tabs().length;
+
+    store.openCommandPalette();
+    expect(store.commandPaletteOpen()).toBe(true);
+
+    store.runCommand("tabs.newScratch");
+    expect(store.tabs().length).toBe(before + 1);
+    expect(store.commandPaletteOpen()).toBe(false);
+  });
+
+  it("searches across open tabs and activates result tab", () => {
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: AI_CLIENT_CONFIG,
+          useValue: { streamUrl: "/api/ai/stream", defaultMockEnabled: true },
+        },
+      ],
+    });
+
+    const store = TestBed.inject(IdeStore);
+    store.openFile("/README.md");
+    store.setSearchQuery("AI IDE Web");
+
+    expect(store.searchResults().length).toBeGreaterThan(0);
+    const first = store.searchResults()[0];
+    store.selectSearchResult(0);
+    store.activateSelectedSearchResult();
+
+    expect(store.activeTabId()).toBe(first.tabId);
+  });
 });

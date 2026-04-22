@@ -1,6 +1,10 @@
 import { inject, Injectable } from "@angular/core";
 
 import { TELEMETRY_CONFIG } from "./telemetry.config";
+import { LoggerService } from "../logging/logger.service";
+import { createTokenBucketRateLimiter } from "../rate-limit/rate-limiter";
+
+import type { TelemetryErrorEvent } from "../api/contracts";
 
 export interface ErrorTelemetryEvent {
   type: "error";
@@ -25,16 +29,25 @@ function shouldSample(rate: number): boolean {
 @Injectable({ providedIn: "root" })
 export class TelemetryService {
   private readonly config = inject(TELEMETRY_CONFIG);
+  private readonly logger = inject(LoggerService);
+  private readonly limiter = createTokenBucketRateLimiter({
+    capacity: 10,
+    refillPerSecond: 1,
+  });
 
   captureError(input: unknown): void {
     if (!this.config.enabled) return;
     if (!shouldSample(this.config.sampleRate)) return;
+    if (!this.limiter.tryRemoveToken()) {
+      this.logger.warn("telemetry.rate_limited");
+      return;
+    }
 
     const event = this.toErrorEvent(input);
     this.send(event);
   }
 
-  private toErrorEvent(input: unknown): ErrorTelemetryEvent {
+  private toErrorEvent(input: unknown): TelemetryErrorEvent {
     const normalized = this.normalizeError(input);
     return {
       type: "error",

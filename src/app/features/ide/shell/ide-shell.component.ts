@@ -53,6 +53,12 @@ export class IdeShellComponent implements AfterViewInit {
   @ViewChild("promptInput")
   private readonly promptInput?: ElementRef<HTMLInputElement>;
 
+  @ViewChild("commandPaletteInput")
+  private readonly commandPaletteInput?: ElementRef<HTMLInputElement>;
+
+  @ViewChild("searchInput")
+  private readonly searchInput?: ElementRef<HTMLInputElement>;
+
   @ViewChild("sidebarResizeHandle")
   private readonly sidebarResizeHandle?: ElementRef<HTMLElement>;
 
@@ -70,12 +76,28 @@ export class IdeShellComponent implements AfterViewInit {
       .subscribe((e) => {
         if (e.key === "Escape") {
           this.store.cancelStream();
+          this.store.closeCommandPalette();
+          this.store.closeSearch();
           return;
         }
 
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") {
           e.preventDefault();
           this.store.openScratchTab();
+          return;
+        }
+
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
+          e.preventDefault();
+          this.store.openCommandPalette();
+          queueMicrotask(() => this.commandPaletteInput?.nativeElement.focus());
+          return;
+        }
+
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+          e.preventDefault();
+          this.store.openSearch();
+          queueMicrotask(() => this.searchInput?.nativeElement.focus());
           return;
         }
 

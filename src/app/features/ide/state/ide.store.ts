@@ -38,6 +38,26 @@ export interface IdeFsNode {
   children?: IdeFsNode[];
 }
 
+export type CommandId =
+  | "tabs.newScratch"
+  | "ai.toggleMock"
+  | "panel.toggleBottom";
+
+export interface CommandItem {
+  id: CommandId;
+  title: string;
+  keywords: string;
+}
+
+export interface SearchMatch {
+  tabId: string;
+  title: string;
+  index: number;
+  line: number;
+  column: number;
+  preview: string;
+}
+
 export interface IdeState {
   tabs: IdeTab[];
   activeTabId: string | null;
@@ -45,6 +65,18 @@ export interface IdeState {
     sidebarWidthPx: number;
     bottomPanelHeightPx: number;
     bottomPanelOpen: boolean;
+  };
+  ui: {
+    commandPalette: {
+      open: boolean;
+      query: string;
+    };
+    search: {
+      open: boolean;
+      query: string;
+      results: SearchMatch[];
+      selectedIndex: number;
+    };
   };
   explorer: {
     root: IdeFsNode;
@@ -88,6 +120,10 @@ const initialState: IdeState = {
     sidebarWidthPx: 288,
     bottomPanelHeightPx: 220,
     bottomPanelOpen: true,
+  },
+  ui: {
+    commandPalette: { open: false, query: "" },
+    search: { open: false, query: "", results: [], selectedIndex: 0 },
   },
   explorer: {
     root: {
@@ -178,6 +214,66 @@ function findNodeByPath(node: IdeFsNode, path: string): IdeFsNode | null {
   return null;
 }
 
+function commandItems(): CommandItem[] {
+  return [
+    {
+      id: "tabs.newScratch",
+      title: "New scratch tab",
+      keywords: "new tab scratch",
+    },
+    {
+      id: "ai.toggleMock",
+      title: "Toggle mock streaming",
+      keywords: "ai mock",
+    },
+    {
+      id: "panel.toggleBottom",
+      title: "Toggle bottom panel",
+      keywords: "panel bottom",
+    },
+  ];
+}
+
+function normalizeQuery(q: string): string {
+  return q.trim().toLowerCase();
+}
+
+function findAllMatches(input: string, query: string): number[] {
+  if (query.length === 0) return [];
+  const matches: number[] = [];
+  const hay = input.toLowerCase();
+  const needle = query.toLowerCase();
+  let i = 0;
+  while (i < hay.length) {
+    const idx = hay.indexOf(needle, i);
+    if (idx < 0) break;
+    matches.push(idx);
+    i = idx + Math.max(1, needle.length);
+  }
+  return matches;
+}
+
+function computeLineAndColumn(
+  value: string,
+  index: number,
+): {
+  line: number;
+  column: number;
+} {
+  const before = value.slice(0, Math.max(0, index));
+  const lines = before.split("\n");
+  const line = lines.length;
+  const column = (lines.at(-1) ?? "").length + 1;
+  return { line, column };
+}
+
+function linePreview(value: string, index: number): string {
+  const start = value.lastIndexOf("\n", Math.max(0, index - 1)) + 1;
+  const endRaw = value.indexOf("\n", Math.max(0, index));
+  const end = endRaw >= 0 ? endRaw : value.length;
+  return value.slice(start, end);
+}
+
 export const IdeStore = signalStore(
   { providedIn: "root" },
   withState(initialState),
@@ -190,6 +286,20 @@ export const IdeStore = signalStore(
     sidebarWidthPx: computed(() => s.layout().sidebarWidthPx),
     bottomPanelHeightPx: computed(() => s.layout().bottomPanelHeightPx),
     bottomPanelOpen: computed(() => s.layout().bottomPanelOpen),
+    commandPaletteOpen: computed(() => s.ui().commandPalette.open),
+    commandPaletteQuery: computed(() => s.ui().commandPalette.query),
+    commandPaletteItems: computed(() => {
+      const q = normalizeQuery(s.ui().commandPalette.query);
+      const items = commandItems();
+      if (q.length === 0) return items;
+      return items.filter((c) =>
+        `${c.title} ${c.keywords}`.toLowerCase().includes(q),
+      );
+    }),
+    searchOpen: computed(() => s.ui().search.open),
+    searchQuery: computed(() => s.ui().search.query),
+    searchResults: computed(() => s.ui().search.results),
+    searchSelectedIndex: computed(() => s.ui().search.selectedIndex),
   })),
   withMethods((s) => {
     const service = inject(AiService);
@@ -272,6 +382,113 @@ export const IdeStore = signalStore(
       },
       setBottomPanelOpen(open: boolean): void {
         patchState(s, { layout: { ...s.layout(), bottomPanelOpen: open } });
+      },
+      openCommandPalette(): void {
+        patchState(s, {
+          ui: {
+            ...s.ui(),
+            commandPalette: { open: true, query: "" },
+          },
+        });
+      },
+      closeCommandPalette(): void {
+        patchState(s, {
+          ui: {
+            ...s.ui(),
+            commandPalette: { ...s.ui().commandPalette, open: false },
+          },
+        });
+      },
+      setCommandPaletteQuery(query: string): void {
+        patchState(s, {
+          ui: {
+            ...s.ui(),
+            commandPalette: { ...s.ui().commandPalette, query },
+          },
+        });
+      },
+      runCommand(id: CommandId): void {
+        if (id === "tabs.newScratch") {
+          this.openScratchTab();
+          this.closeCommandPalette();
+          return;
+        }
+        if (id === "ai.toggleMock") {
+          this.setUseMock(!s.ai().useMock);
+          this.closeCommandPalette();
+          return;
+        }
+        if (id === "panel.toggleBottom") {
+          this.setBottomPanelOpen(!s.layout().bottomPanelOpen);
+          this.closeCommandPalette();
+        }
+      },
+      openSearch(): void {
+        patchState(s, {
+          ui: {
+            ...s.ui(),
+            search: {
+              open: true,
+              query: s.ui().search.query,
+              results: [],
+              selectedIndex: 0,
+            },
+          },
+        });
+      },
+      closeSearch(): void {
+        patchState(s, {
+          ui: { ...s.ui(), search: { ...s.ui().search, open: false } },
+        });
+      },
+      setSearchQuery(query: string): void {
+        const q = query;
+        const needle = normalizeQuery(q);
+        const results: SearchMatch[] = [];
+        if (needle.length > 0) {
+          for (const tab of s.tabs()) {
+            for (const idx of findAllMatches(tab.value, needle)) {
+              const pos = computeLineAndColumn(tab.value, idx);
+              results.push({
+                tabId: tab.id,
+                title: tab.title,
+                index: idx,
+                line: pos.line,
+                column: pos.column,
+                preview: linePreview(tab.value, idx),
+              });
+            }
+          }
+        }
+        patchState(s, {
+          ui: {
+            ...s.ui(),
+            search: {
+              ...s.ui().search,
+              query: q,
+              results,
+              selectedIndex: 0,
+            },
+          },
+        });
+      },
+      selectSearchResult(index: number): void {
+        const clamped = Math.min(
+          Math.max(0, Math.floor(index)),
+          Math.max(0, s.ui().search.results.length - 1),
+        );
+        patchState(s, {
+          ui: {
+            ...s.ui(),
+            search: { ...s.ui().search, selectedIndex: clamped },
+          },
+        });
+      },
+      activateSelectedSearchResult(): void {
+        const idx = s.ui().search.selectedIndex;
+        const item = s.ui().search.results[idx];
+        if (!item) return;
+        patchState(s, { activeTabId: item.tabId });
       },
       toggleFolder(path: string): void {
         const node = findNodeByPath(s.explorer().root, path);

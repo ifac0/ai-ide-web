@@ -11,6 +11,30 @@ test("opens a file from explorer and creates a tab", async ({ page }) => {
   await expect(page.getByTestId("tab-README.md")).toBeVisible();
 });
 
+test("command palette opens and creates scratch tab", async ({ page }) => {
+  await page.goto("/");
+
+  await page.keyboard.press("Meta+P");
+  await expect(page.getByTestId("command-palette-overlay")).toBeVisible();
+
+  await page.getByTestId("command-palette-input").fill("scratch");
+  await page.getByTestId("command-tabs.newScratch").click();
+  await expect(page.getByTestId("command-palette-overlay")).toHaveCount(0);
+});
+
+test("search opens and activates a result tab", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByTestId("explorer-node-/README.md").click();
+  await page.keyboard.press("Meta+F");
+  await expect(page.getByTestId("search-overlay")).toBeVisible();
+
+  await page.getByTestId("search-input").fill("AI IDE Web");
+  await expect(page.getByTestId("search-result").first()).toBeVisible();
+  await page.getByTestId("search-result").first().click();
+  await expect(page.getByTestId("monaco-editor")).toBeVisible();
+});
+
 test("streams AI output and can cancel", async ({ page }) => {
   await page.goto("/");
 

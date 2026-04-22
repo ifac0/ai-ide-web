@@ -3,6 +3,106 @@
   [style.gridTemplateColumns]="' ' + store.sidebarWidthPx() + 'px 1fr'"
   data-testid="ide-root"
 >
+  @if (store.commandPaletteOpen()) {
+    <div
+      class="fixed inset-0 bg-black/50 flex items-start justify-center pt-24 z-50"
+      (click)="store.closeCommandPalette()"
+      data-testid="command-palette-overlay"
+    >
+      <div
+        class="w-[min(720px,calc(100vw-24px))] rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-panel)] shadow-[var(--shadow-md)]"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="p-3 border-b border-[color:var(--color-border)]">
+          <input
+            #commandPaletteInput
+            class="w-full h-10 rounded-md border border-[color:var(--color-border)] bg-black/20 px-3 text-sm"
+            type="text"
+            placeholder="Type a command…"
+            [value]="store.commandPaletteQuery()"
+            (input)="store.setCommandPaletteQuery($any($event.target).value)"
+            data-testid="command-palette-input"
+          />
+        </div>
+        <div class="max-h-[360px] overflow-auto p-2">
+          @for (cmd of store.commandPaletteItems(); track cmd.id) {
+            <button
+              type="button"
+              class="w-full text-left px-3 py-2 rounded-md hover:bg-white/10"
+              (click)="store.runCommand(cmd.id)"
+              [attr.data-testid]="'command-' + cmd.id"
+            >
+              <div class="text-sm font-medium">{{ cmd.title }}</div>
+            </button>
+          }
+          @if (store.commandPaletteItems().length === 0) {
+            <div class="px-3 py-6 text-sm opacity-70">No commands</div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (store.searchOpen()) {
+    <div
+      class="fixed inset-0 bg-black/50 flex items-start justify-center pt-24 z-40"
+      (click)="store.closeSearch()"
+      data-testid="search-overlay"
+    >
+      <div
+        class="w-[min(900px,calc(100vw-24px))] rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-panel)] shadow-[var(--shadow-md)]"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="p-3 border-b border-[color:var(--color-border)]">
+          <input
+            #searchInput
+            class="w-full h-10 rounded-md border border-[color:var(--color-border)] bg-black/20 px-3 text-sm"
+            type="text"
+            placeholder="Search in open tabs…"
+            [value]="store.searchQuery()"
+            (input)="store.setSearchQuery($any($event.target).value)"
+            data-testid="search-input"
+          />
+        </div>
+        <div class="max-h-[420px] overflow-auto p-2">
+          @for (r of store.searchResults(); track r.tabId + "-" + r.index) {
+            <button
+              type="button"
+              class="w-full text-left px-3 py-2 rounded-md hover:bg-white/10"
+              [ngClass]="
+                store.searchResults().indexOf(r) === store.searchSelectedIndex()
+                  ? 'bg-white/10'
+                  : ''
+              "
+              (mouseenter)="
+                store.selectSearchResult(store.searchResults().indexOf(r))
+              "
+              (click)="store.activateSelectedSearchResult()"
+              data-testid="search-result"
+            >
+              <div class="text-xs opacity-70">
+                {{ r.title }} · L{{ r.line }}:C{{ r.column }}
+              </div>
+              <div class="text-sm font-[family:var(--font-mono)]">
+                {{ r.preview }}
+              </div>
+            </button>
+          }
+          @if (
+            store.searchResults().length === 0 && store.searchQuery().length > 0
+          ) {
+            <div class="px-3 py-6 text-sm opacity-70">No results</div>
+          }
+          @if (store.searchQuery().length === 0) {
+            <div class="px-3 py-6 text-sm opacity-70">
+              Type to search across open tabs
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
   <aside
     class="h-full border-r border-[color:var(--color-border)] bg-[color:var(--color-panel)] relative"
     [ngClass]="sidebarCollapsed ? 'w-12' : ''"
@@ -167,6 +267,8 @@
             />
             Mock streaming
           </label>
+          <div class="opacity-70">Ctrl/Cmd+P Command palette</div>
+          <div class="opacity-70">Ctrl/Cmd+F Search</div>
           <button
             type="button"
             class="h-8 px-3 rounded-md border border-[color:var(--color-border)] text-xs disabled:opacity-60"
