@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: install
+        run: npm ci
+
+      - name: format
+        run: npm run format
+
+      - name: lint
+        run: npm run lint:eslint
+
+      - name: unit tests
+        run: npm test -- --runInBand
+
+      - name: playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: e2e
+        run: npm run e2e

@@ -12,6 +12,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
     "lint": "ng lint",
     "lint:eslint": "eslint .",
     "format": "prettier . --check",
@@ -51,11 +53,13 @@
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
     "@compodoc/compodoc": "^1.1.27",
+    "@playwright/test": "^1.55.0",
     "@types/jest": "^30.0.0",
+    "@types/node": "^24.3.0",
     "@typescript-eslint/eslint-plugin": "^8.34.0",
     "@typescript-eslint/parser": "^8.34.0",
     "autoprefixer": "^10.4.21",
-    "eslint": "^9.22.0",
+    "eslint": "^8.57.0",
     "eslint-config-prettier": "^10.1.0",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-rxjs": "^5.0.3",
@@ -63,10 +67,12 @@
     "husky": "^9.1.7",
     "jest": "^30.0.4",
     "jest-environment-jsdom": "^30.0.4",
+    "jest-preset-angular": "^16.1.4",
     "lint-staged": "^16.1.0",
     "postcss": "^8.5.6",
     "prettier": "^3.6.2",
     "tailwindcss": "^4.1.12",
+    "ts-jest": "^29.4.0",
     "typescript": "^5.8.3"
   },
   "lint-staged": {
@@ -78,4 +84,3 @@
     ]
   }
 }
-
