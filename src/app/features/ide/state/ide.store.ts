@@ -7,7 +7,15 @@ import {
   withState,
 } from "@ngrx/signals";
 import { rxMethod } from "@ngrx/signals/rxjs-interop";
-import { filter, finalize, map, switchMap, tap } from "rxjs";
+import {
+  Subject,
+  filter,
+  finalize,
+  map,
+  switchMap,
+  takeUntil,
+  tap,
+} from "rxjs";
 
 import { AiService, type AiStreamEvent } from "../../../core/ai/ai.service";
 
@@ -25,6 +33,7 @@ export interface IdeState {
     prompt: string;
     streaming: boolean;
     output: string;
+    useMock: boolean;
   };
 }
 
@@ -42,6 +51,7 @@ const initialState: IdeState = {
     prompt: "",
     streaming: false,
     output: "",
+    useMock: true,
   },
 };
 
@@ -59,6 +69,7 @@ export const IdeStore = signalStore(
   })),
   withMethods((s) => {
     const service = inject(AiService);
+    const cancel$ = new Subject<void>();
 
     const onAiEvent = (evt: AiStreamEvent): void => {
       if ("done" in evt) {
@@ -72,17 +83,30 @@ export const IdeStore = signalStore(
       prompt$.pipe(
         map((prompt) => prompt.trim()),
         filter((p) => p.length > 0),
+        tap(() => cancel$.next()),
         tap((prompt) =>
-          patchState(s, { ai: { prompt, streaming: true, output: "" } }),
+          patchState(s, {
+            ai: { ...s.ai(), prompt, streaming: true, output: "" },
+          }),
         ),
         switchMap((prompt) =>
-          service.streamCompletion(prompt, { mock: true }).pipe(
+          service.streamCompletion(prompt, { mock: s.ai().useMock }).pipe(
             tap(onAiEvent),
+            takeUntil(cancel$),
             finalize(() =>
               patchState(s, { ai: { ...s.ai(), streaming: false } }),
             ),
           ),
         ),
+      ),
+    );
+
+    const cancelStream = rxMethod<void>((trigger$) =>
+      trigger$.pipe(
+        tap(() => {
+          cancel$.next();
+          patchState(s, { ai: { ...s.ai(), streaming: false } });
+        }),
       ),
     );
 
@@ -113,23 +137,25 @@ export const IdeStore = signalStore(
       openScratchTab(): void {
         const id = randomId();
         patchState(s, {
-          tabs: s
-            .tabs()
-            .concat({
-              id,
-              title: `scratch-${id.slice(0, 4)}.ts`,
-              language: "typescript",
-              value: "",
-            }),
+          tabs: s.tabs().concat({
+            id,
+            title: `scratch-${id.slice(0, 4)}.ts`,
+            language: "typescript",
+            value: "",
+          }),
           activeTabId: id,
         });
       },
       setPrompt(prompt: string): void {
         patchState(s, { ai: { ...s.ai(), prompt } });
       },
+      setUseMock(useMock: boolean): void {
+        patchState(s, { ai: { ...s.ai(), useMock } });
+      },
       startPromptStream(): void {
         streamPrompt(s.ai().prompt);
       },
+      cancelStream,
       streamPrompt,
       onAiEvent,
     };

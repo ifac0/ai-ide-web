@@ -2,11 +2,19 @@ import { TestBed } from "@angular/core/testing";
 import { Subject } from "rxjs";
 
 import { IdeStore } from "./ide.store";
+import { AI_CLIENT_CONFIG } from "../../../core/ai/ai.config";
 import { AiService, type AiStreamEvent } from "../../../core/ai/ai.service";
 
 describe("IdeStore", () => {
   it("opens a scratch tab and activates it", () => {
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: AI_CLIENT_CONFIG,
+          useValue: { streamUrl: "/api/ai/stream", defaultMockEnabled: true },
+        },
+      ],
+    });
     const store = TestBed.inject(IdeStore);
 
     const beforeTabs = store.tabs();
@@ -18,7 +26,14 @@ describe("IdeStore", () => {
   });
 
   it("updates active tab value via editorValueChanged rxMethod", () => {
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: AI_CLIENT_CONFIG,
+          useValue: { streamUrl: "/api/ai/stream", defaultMockEnabled: true },
+        },
+      ],
+    });
     const store = TestBed.inject(IdeStore);
 
     const activeBefore = store.activeTab();
@@ -38,7 +53,13 @@ describe("IdeStore", () => {
     };
 
     TestBed.configureTestingModule({
-      providers: [{ provide: AiService, useValue: aiService }],
+      providers: [
+        { provide: AiService, useValue: aiService },
+        {
+          provide: AI_CLIENT_CONFIG,
+          useValue: { streamUrl: "/api/ai/stream", defaultMockEnabled: true },
+        },
+      ],
     });
 
     const store = TestBed.inject(IdeStore);

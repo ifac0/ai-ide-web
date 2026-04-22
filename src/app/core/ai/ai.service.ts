@@ -18,6 +18,8 @@ import {
   type Observable,
 } from "rxjs";
 
+import { AI_CLIENT_CONFIG } from "./ai.config";
+
 export interface AiStreamDelta {
   delta: string;
 }
@@ -73,14 +75,16 @@ function toEvent(chunk: SseChunk): AiStreamEvent | null {
 @Injectable({ providedIn: "root" })
 export class AiService {
   private readonly http = inject(HttpClient);
+  private readonly config = inject(AI_CLIENT_CONFIG);
 
   streamCompletion(
     prompt: string,
     options?: { mock?: boolean },
   ): Observable<AiStreamEvent> {
-    const headers = options?.mock ? { "x-mock-ai": "1" } : undefined;
+    const mockEnabled = options?.mock ?? this.config.defaultMockEnabled;
+    const headers = mockEnabled ? { "x-mock-ai": "1" } : undefined;
 
-    const events$ = this.http.request("POST", "/api/ai/stream", {
+    const events$ = this.http.request("POST", this.config.streamUrl, {
       body: { prompt },
       observe: "events",
       responseType: "text",

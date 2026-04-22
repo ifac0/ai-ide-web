@@ -7,6 +7,7 @@ import {
 import { TestBed } from "@angular/core/testing";
 import { Subject, firstValueFrom, take, toArray } from "rxjs";
 
+import { AI_CLIENT_CONFIG } from "./ai.config";
 import { AiService } from "./ai.service";
 
 describe("AiService", () => {
@@ -26,7 +27,14 @@ describe("AiService", () => {
     };
 
     TestBed.configureTestingModule({
-      providers: [AiService, { provide: HttpClient, useValue: http }],
+      providers: [
+        AiService,
+        { provide: HttpClient, useValue: http },
+        {
+          provide: AI_CLIENT_CONFIG,
+          useValue: { streamUrl: "/api/ai/stream", defaultMockEnabled: false },
+        },
+      ],
     });
 
     const service = TestBed.inject(AiService);
@@ -52,7 +60,14 @@ describe("AiService", () => {
     };
 
     TestBed.configureTestingModule({
-      providers: [AiService, { provide: HttpClient, useValue: http }],
+      providers: [
+        AiService,
+        { provide: HttpClient, useValue: http },
+        {
+          provide: AI_CLIENT_CONFIG,
+          useValue: { streamUrl: "/api/ai/stream", defaultMockEnabled: false },
+        },
+      ],
     });
 
     const service = TestBed.inject(AiService);
